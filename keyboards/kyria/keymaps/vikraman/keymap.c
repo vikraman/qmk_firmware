@@ -129,13 +129,24 @@ layer_state_t layer_state_set_user(layer_state_t state) {
     return update_tri_layer_state(state, _LOWER, _RAISE, _ADJUST);
 }
 
+void set_keylog(uint16_t keycode);
+const char *read_keylog(void);
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+#ifdef OLED_DRIVER_ENABLE
+        set_keylog(keycode);
+#endif
+    }
+    return true;
+}
+
 #ifdef OLED_DRIVER_ENABLE
 oled_rotation_t oled_init_user(oled_rotation_t rotation) {
     return OLED_ROTATION_180;
 }
 
-static void render_status(void) {
-    // Host Keyboard Layer Status
+static void render_layer_status(void) {
     oled_write_P(PSTR("Layer: "), false);
     switch (get_highest_layer(layer_state)) {
         case _QWERTY:
@@ -153,21 +164,43 @@ static void render_status(void) {
         default:
             oled_write_P(PSTR("Undefined\n"), false);
     }
+}
 
-    // Host Keyboard LED Status
-    uint8_t led_usb_state = host_keyboard_leds();
-    oled_write_P(IS_LED_ON(led_usb_state, USB_LED_NUM_LOCK) ? PSTR("NUMLCK ") : PSTR("       "), false);
-    oled_write_P(IS_LED_ON(led_usb_state, USB_LED_CAPS_LOCK) ? PSTR("CAPLCK ") : PSTR("       "), false);
-    oled_write_P(IS_LED_ON(led_usb_state, USB_LED_SCROLL_LOCK) ? PSTR("SCRLCK ") : PSTR("       "), false);
+static void render_keylock_status(uint8_t led_usb_state) {
+    oled_write_P(PSTR("Lock: "), false);
+    oled_write_P(PSTR("NUML"), led_usb_state & (1 << USB_LED_NUM_LOCK));
+    oled_write_P(PSTR(" "), false);
+    oled_write_P(PSTR("CAPS"), led_usb_state & (1 << USB_LED_CAPS_LOCK));
+    oled_write_P(PSTR(" "), false);
+    oled_write_ln_P(PSTR("SCLK"), led_usb_state & (1 << USB_LED_SCROLL_LOCK));
+}
+
+static void render_keylogger(void) {
+    oled_write_P(PSTR("Keylogger: "), false);
+    oled_write(read_keylog(), false);
+}
+
+static void render_mod_status(uint8_t modifiers) {
+    oled_write_P(PSTR("Mods: "), false);
+    oled_write_P(PSTR("Sft"), (modifiers & MOD_MASK_SHIFT));
+    oled_write_P(PSTR(" "), false);
+    oled_write_P(PSTR("Ctl"), (modifiers & MOD_MASK_CTRL));
+    oled_write_P(PSTR(" "), false);
+    oled_write_P(PSTR("Alt"), (modifiers & MOD_MASK_ALT));
+    oled_write_P(PSTR(" "), false);
+    oled_write_P(PSTR("Gui"), (modifiers & MOD_MASK_GUI));
 }
 
 void oled_task_user(void) {
     if (is_keyboard_master()) {
         oled_write_P(PSTR("Master\n"), false);
+        render_layer_status();
+        render_keylogger();
     } else {
         oled_write_P(PSTR("Slave\n"), false);
+        render_keylock_status(host_keyboard_leds());
+        render_mod_status(get_mods() | get_oneshot_mods());
     }
-    render_status();
 }
 #endif
 

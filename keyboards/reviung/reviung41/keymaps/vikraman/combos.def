@@ -3,7 +3,13 @@
 COMBO_REF_LAYER(_COLEMAK, _QWERTY)
 
 //   name        result                         chord keys
-COMB(JK_TAB,    KC_BSLS,                        RSFT_T(KC_J), RGUI_T(KC_K))
-COMB(JKL_SPC,   KC_SPC,                         RSFT_T(KC_J), RGUI_T(KC_K), LALT_T(KC_L))
 COMB(QW_UNDO,   C(KC_Z),                        KC_Q, KC_W)
-SUBS(WE_EMAIL,  "vikraman.choudhury@gmail.com", KC_W, KC_E)
+COMB(WE_SEL,    SELWORD,                        KC_W, KC_E)
+SUBS(EM_EMAIL,  "vikraman.choudhury@gmail.com", KC_E, KC_M)
+
+COMB(OP_BSLS,   KC_BSLS,                        KC_O, KC_P)
+COMB(MCOM_UNDS, KC_UNDS,                        KC_M, KC_COMM)
+COMB(XC_MINS,   KC_MINS,                        KC_X, KC_C)
+
+COMB(JK_TAB,   KC_TAB,                          RSFT_T(KC_J), RGUI_T(KC_K))
+COMB(JKL_SPC,  KC_SPC,                          RSFT_T(KC_J), RGUI_T(KC_K), LALT_T(KC_L))

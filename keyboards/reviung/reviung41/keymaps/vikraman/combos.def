@@ -1,0 +1,9 @@
+// Alternate reference layers by layer
+//               Layer    Reference layer
+COMBO_REF_LAYER(_COLEMAK, _QWERTY)
+
+//   name        result                         chord keys
+COMB(JK_TAB,    KC_BSLS,                        RSFT_T(KC_J), RGUI_T(KC_K))
+COMB(JKL_SPC,   KC_SPC,                         RSFT_T(KC_J), RGUI_T(KC_K), LALT_T(KC_L))
+COMB(QW_UNDO,   C(KC_Z),                        KC_Q, KC_W)
+SUBS(WE_EMAIL,  "vikraman.choudhury@gmail.com", KC_W, KC_E)

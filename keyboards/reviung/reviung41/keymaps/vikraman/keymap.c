@@ -17,6 +17,8 @@
 
 enum layer_names { _QWERTY = 0, _COLEMAK, _LOWER, _RAISE, _ADJUST };
 
+#include "g/keymap_combo.h"
+
 #define QWERTY DF(_QWERTY)
 #define COLEMAK DF(_COLEMAK)
 

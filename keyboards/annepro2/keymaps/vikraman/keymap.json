@@ -1,3 +1,8 @@
 {
-    "modules": ["getreuer/select_word", "getreuer/sentence_case"]
+    "modules": [
+        "getreuer/select_word",
+        "getreuer/sentence_case",
+        "getreuer/lumino",
+        "getreuer/palettefx"
+    ]
 }

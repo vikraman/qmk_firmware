@@ -16,3 +16,5 @@ CAPS_WORD_ENABLE = yes
 COMBO_ENABLE = yes
 VPATH += keyboards/gboards
 TAP_DANCE_ENABLE = no
+
+RGB_MATRIX_ENABLE = yes

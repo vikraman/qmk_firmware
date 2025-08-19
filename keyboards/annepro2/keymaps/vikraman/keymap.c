@@ -111,8 +111,8 @@ enum anne_pro_layers {
   */
  [FN2] = LAYOUT_60_ansi( /* FN2 */
     _______, KC_AP2_BT1, KC_AP2_BT2, KC_AP2_BT3, KC_AP2_BT4, _______, _______, _______, _______, KC_AP_RGB_MOD, KC_AP_RGB_TOG, KC_AP_RGB_VAD, KC_AP_RGB_VAI, _______,
-    _______, _______,    KC_UP,      _______,    _______,    _______, EE_CLR,  _______, _______, _______,       KC_PSCR,       KC_HOME,       KC_END,        _______,
-    _______, KC_LEFT,    KC_DOWN,    KC_RGHT,    _______,    _______, QK_RBT,  _______, _______, _______,       KC_PGUP,       KC_PGDN,       _______,
+    _______, RM_SPDU,    RM_SATU,    RM_HUEU,    RM_NEXT,    LUMINO,  EE_CLR,  _______, _______, _______,       KC_PSCR,       KC_HOME,       KC_END,        _______,
+    _______, RM_SPDD,    RM_SATD,    RM_HUED,    RM_PREV,    _______, QK_RBT,  _______, _______, _______,       KC_PGUP,       KC_PGDN,       _______,
     _______,             _______,    _______,    _______,    _______, _______, QK_BOOT, _______, _______,       KC_INS,        KC_DEL,        _______,
     _______, _______,    _______,                                     _______,                   _______,       _______,       _______,       _______
  ),
@@ -120,22 +120,27 @@ enum anne_pro_layers {
 // clang-format on
 
 void keyboard_post_init_user(void) {
+    ap2_led_set_manual_control(1);
     ap2_led_enable();
-    ap2_led_set_profile(8);
+
+    rgb_matrix_mode_noeeprom(RGB_MATRIX_CUSTOM_PALETTEFX_REACTIVE);
+    uint8_t palette_index = PALETTEFX_VIRIDIS;
+    rgb_matrix_sethsv_noeeprom(RGB_MATRIX_HUE_STEP * palette_index, 255, 255);
+    rgb_matrix_set_speed_noeeprom(128);
+    rgb_matrix_enable_noeeprom();
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
     switch (get_highest_layer(state)) {
         case FN1:
-            // Set the leds to turquoise
-            ap2_led_set_foreground_color(0x77, 0xBB, 0x77);
+            ap2_led_t turquoise = {.p.red = 0x77, .p.green = 0xBB, .p.blue = 0x77, .p.alpha = 0xff};
+            ap2_led_blink(4, 10, turquoise, 5, 10);
             break;
         case FN2:
-            // Set the leds to green
-            ap2_led_set_foreground_color(0x77, 0xFF, 0x00);
+            ap2_led_t green = {.p.red = 0x77, .p.green = 0xFF, .p.blue = 0x00, .p.alpha = 0xff};
+            ap2_led_blink(4, 11, green, 5, 10);
             break;
         default:
-            // Reset back to the current profile
             ap2_led_reset_foreground_color();
             break;
     }

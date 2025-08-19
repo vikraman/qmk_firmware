@@ -17,6 +17,7 @@ VIA_ENABLE = no
 
 COMBO_ENABLE = yes
 VPATH += keyboards/gboards
+TAP_DANCE_ENABLE = yes
 
 RGBLIGHT_ENABLE=yes
 VELOCIKEY_ENABLE=yes

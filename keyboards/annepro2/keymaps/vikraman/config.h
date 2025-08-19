@@ -1,0 +1,9 @@
+#pragma once
+
+#define TAPPING_TERM 200
+#define CHORDAL_HOLD
+#define PERMISSIVE_HOLD
+#define RETRO_SHIFT 500
+#define DOUBLE_TAP_SHIFT_TURNS_ON_CAPS_WORD
+#define TAPPING_TOGGLE 2
+#define SELECT_WORD_OS_MAC

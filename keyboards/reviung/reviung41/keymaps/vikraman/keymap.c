@@ -19,6 +19,14 @@ enum layer_names { _QWERTY = 0, _COLEMAK, _LOWER, _RAISE, _ADJUST };
 
 #include "g/keymap_combo.h"
 
+enum {
+    TD_TAB_ESC,
+};
+
+tap_dance_action_t tap_dance_actions[] = {
+    [TD_TAB_ESC] = ACTION_TAP_DANCE_DOUBLE(KC_TAB, KC_ESC),
+};
+
 #define QWERTY DF(_QWERTY)
 #define COLEMAK DF(_COLEMAK)
 
@@ -29,14 +37,14 @@ enum layer_names { _QWERTY = 0, _COLEMAK, _LOWER, _RAISE, _ADJUST };
 // clang-format off
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [_QWERTY] = LAYOUT(
-    KC_TAB,           KC_Q,           KC_W,           KC_E,           KC_R,           KC_T,           KC_Y,           KC_U,           KC_I,           KC_O,           KC_P,            KC_BSPC,
+    TD(TD_TAB_ESC),   KC_Q,           KC_W,           KC_E,           KC_R,           KC_T,           KC_Y,           KC_U,           KC_I,           KC_O,           KC_P,            KC_BSPC,
     LCTL_T(KC_ESC),   LCTL_T(KC_A),   LALT_T(KC_S),   LGUI_T(KC_D),   LSFT_T(KC_F),   KC_G,           KC_H,           RSFT_T(KC_J),   RGUI_T(KC_K),   LALT_T(KC_L),   RCTL_T(KC_SCLN), RCTL_T(KC_QUOT),
     KC_LSFT,          KC_Z,           KC_X,           KC_C,           KC_V,           KC_B,           KC_N,           KC_M,           KC_COMM,        KC_DOT,         KC_SLSH,         RSFT_T(KC_ENT),
                                                       KC_LALT,        LOWER,          KC_SPC,         RAISE,          KC_RGUI
   ),
 
   [_COLEMAK] = LAYOUT(
-    KC_TAB,           KC_Q,           KC_W,           KC_F,           KC_P,           KC_B,           KC_J,           KC_L,           KC_U,           KC_Y,           KC_SCLN,         KC_BSPC,
+    TD(TD_TAB_ESC),   KC_Q,           KC_W,           KC_F,           KC_P,           KC_B,           KC_J,           KC_L,           KC_U,           KC_Y,           KC_SCLN,         KC_BSPC,
     LCTL_T(KC_ESC),   LCTL_T(KC_A),   LALT_T(KC_R),   LGUI_T(KC_S),   LSFT_T(KC_T),   KC_G,           KC_M,           RSFT_T(KC_N),   RGUI_T(KC_E),   LALT_T(KC_I),   RCTL_T(KC_O),    RCTL_T(KC_QUOT),
     KC_LSFT,          KC_Z,           KC_X,           KC_C,           KC_D,           KC_V,           KC_K,           KC_H,           KC_COMM,        KC_DOT,         KC_SLSH,         RSFT_T(KC_ENT),
                                                       KC_LALT,        LOWER,          KC_SPC,         RAISE,          KC_RGUI

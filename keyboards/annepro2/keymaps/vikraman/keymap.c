@@ -111,9 +111,9 @@ enum anne_pro_layers {
   */
  [FN2] = LAYOUT_60_ansi( /* FN2 */
     _______, KC_AP2_BT1, KC_AP2_BT2, KC_AP2_BT3, KC_AP2_BT4, _______, _______, _______, _______, KC_AP_RGB_MOD, KC_AP_RGB_TOG, KC_AP_RGB_VAD, KC_AP_RGB_VAI, _______,
-    _______, RM_SPDU,    RM_SATU,    RM_HUEU,    RM_NEXT,    LUMINO,  EE_CLR,  _______, _______, _______,       KC_PSCR,       KC_HOME,       KC_END,        _______,
-    _______, RM_SPDD,    RM_SATD,    RM_HUED,    RM_PREV,    _______, QK_RBT,  _______, _______, _______,       KC_PGUP,       KC_PGDN,       _______,
-    _______,             _______,    _______,    _______,    _______, _______, QK_BOOT, _______, _______,       KC_INS,        KC_DEL,        _______,
+    _______, RM_SPDU,    RM_SATU,    RM_HUEU,    RM_NEXT,    LUMINO,  EE_CLR,  AS_UP,   _______, _______,       KC_PSCR,       KC_HOME,       KC_END,        _______,
+    _______, RM_SPDD,    RM_SATD,    RM_HUED,    RM_PREV,    _______, QK_RBT,  AS_DOWN, _______, _______,       KC_PGUP,       KC_PGDN,       _______,
+    _______,             _______,    _______,    _______,    _______, _______, QK_BOOT, AS_TOGG, AS_RPT,        KC_INS,        KC_DEL,        _______,
     _______, _______,    _______,                                     _______,                   _______,       _______,       _______,       _______
  ),
 };

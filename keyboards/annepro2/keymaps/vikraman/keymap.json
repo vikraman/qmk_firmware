@@ -1,5 +1,6 @@
 {
     "modules": [
+        "getreuer/speculative_hold",
         "getreuer/select_word",
         "getreuer/sentence_case",
         "getreuer/lumino",

@@ -133,11 +133,11 @@ void keyboard_post_init_user(void) {
 layer_state_t layer_state_set_user(layer_state_t state) {
     switch (get_highest_layer(state)) {
         case FN1:
-            ap2_led_t turquoise = {.p.red = 0x77, .p.green = 0xBB, .p.blue = 0x77, .p.alpha = 0xff};
+            ap2_led_t turquoise = {.p.red = 0x77, .p.green = 0xBB, .p.blue = 0x77, .p.alpha = 0xFF};
             ap2_led_blink(4, 10, turquoise, 5, 10);
             break;
         case FN2:
-            ap2_led_t green = {.p.red = 0x77, .p.green = 0xFF, .p.blue = 0x00, .p.alpha = 0xff};
+            ap2_led_t green = {.p.red = 0x77, .p.green = 0xFF, .p.blue = 0x00, .p.alpha = 0xFF};
             ap2_led_blink(4, 11, green, 5, 10);
             break;
         default:
@@ -145,4 +145,15 @@ layer_state_t layer_state_set_user(layer_state_t state) {
             break;
     }
     return state;
+}
+
+bool get_custom_auto_shifted_key(uint16_t keycode, keyrecord_t *record) {
+    if (IS_RETRO(keycode)) return true;
+
+    switch (keycode) {
+        case QK_MOD_TAP ... QK_MOD_TAP_MAX:
+            return true;
+        default:
+            return false;
+    }
 }

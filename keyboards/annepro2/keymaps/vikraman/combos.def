@@ -1,7 +1,7 @@
 //   name        result                         chord keys
 COMB(QW_UNDO,   C(KC_Z),                        KC_Q, KC_W)
 COMB(WE_SEL,    SELWORD,                        KC_W, KC_E)
-SUBS(EM_EMAIL,  "vikraman.choudhury@gmail.com", KC_E, KC_M)
+// SUBS(EM_EMAIL,  "vikraman.choudhury@gmail.com", KC_E, KC_M)
 
 COMB(OP_BSLS,   KC_BSLS,                        KC_O, KC_P)
 COMB(MCOM_UNDS, KC_UNDS,                        KC_M, KC_COMM)

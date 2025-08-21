@@ -98,7 +98,7 @@ const uint16_t keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     TAB_ESC,  Q_CMD,   W_CMD,   KC_E,  R_CMD, T_CMD, KC_Y,   KC_U,  KC_I,  O_CMD,   KC_P,             LBRC_CMD,         RBRC_CMD,      KC_BSLS,
     KC_LCTL,  CTL_A,   ALT_S,   GUI_D, SFT_F, KC_G,  KC_H,   SFT_J, GUI_K, ALT_L,   CTL_SCLN,         KC_QUOT,          KC_ENT,
     KC_LSFT,           Z_CMD,   X_CMD, C_CMD, V_CMD, KC_B,   N_CMD, KC_M,  KC_COMM, KC_DOT,           KC_SLSH,          RSFT_T(KC_UP),
-    KC_LCTL,  KC_LALT, KC_LGUI,                   SPC_ENT,                 KC_RGUI, LT(FN1, KC_LEFT), LT(FN2, KC_DOWN), RCTL_T(KC_RGHT)
+    KC_LCTL,  KC_LALT, _______,                   SPC_ENT,                 KC_RGUI, LT(FN1, KC_LEFT), LT(FN2, KC_DOWN), RCTL_T(KC_RGHT)
 ),
   /*
   * Layer FN1

@@ -19,12 +19,13 @@
 
 const pointing_device_driver_t navigator_trackpad_pointing_device_driver = {.init = navigator_trackpad_device_init, .get_report = navigator_trackpad_get_report, .get_cpi = navigator_trackpad_get_cpi, .set_cpi = navigator_trackpad_set_cpi};
 
+deferred_token callback_token = 0;
 uint16_t    current_cpi = DEFAULT_CPI_TICK;
 uint32_t    gpio_offset_addr;
 uint8_t     has_motion = 0;
 extern bool set_scrolling;
 bool        in_motion;
-bool        touchpad_init;
+bool        trackpad_init;
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 cgen6_report_t ptp_report;
@@ -37,6 +38,10 @@ int16_t        ptp_delta_x, ptp_delta_y;
 
 i2c_status_t cirque_gen6_read_report(uint8_t *data, uint16_t cnt) {
     i2c_status_t res = i2c_receive(NAVIGATOR_TRACKPAD_ADDRESS, data, cnt, NAVIGATOR_TRACKPAD_TIMEOUT);
+    if (res != I2C_STATUS_SUCCESS) {
+        trackpad_init = false;
+        return res;
+    }
     wait_us(cnt * 15);
     return res;
 }
@@ -64,6 +69,7 @@ uint8_t cirque_gen6_read_memory(uint32_t addr, uint8_t *data, uint16_t cnt) {
     uint8_t buf[cnt + 3];
     if (i2c_transmit_and_receive(NAVIGATOR_TRACKPAD_ADDRESS, preamble, 8, buf, cnt + 3, NAVIGATOR_TRACKPAD_TIMEOUT) != I2C_STATUS_SUCCESS) {
         res |= CGEN6_I2C_FAILED;
+        trackpad_init = false;
     }
 
     // Read the data length
@@ -112,6 +118,7 @@ uint8_t cirque_gen6_write_memory(uint32_t addr, uint8_t *data, uint16_t cnt) {
 
     if (i2c_transmit(NAVIGATOR_TRACKPAD_ADDRESS, buf, cnt + 9, NAVIGATOR_TRACKPAD_TIMEOUT) != I2C_STATUS_SUCCESS) {
         res |= CGEN6_I2C_FAILED;
+        trackpad_init = false;
     }
 
     wait_ms(1);
@@ -221,13 +228,10 @@ bool cirque_gen6_get_gpio_state(uint8_t num) {
     return ((gpio_states >> num) & 0x000000001);
 }
 
-uint32_t cirque_gen_6_read_callback(uint32_t trigger_time, void *cb_arg) {
-    if (has_motion) {
-        return NAVIGATOR_TRACKPAD_READ;
-    }
+void cirque_gen_6_read_report(void) {
     uint8_t packet[CGEN6_MAX_PACKET_SIZE];
     if (cirque_gen6_read_report(packet, CGEN6_MAX_PACKET_SIZE) != I2C_STATUS_SUCCESS) {
-        return false;
+        return;
     }
 
     uint8_t report_id = packet[2];
@@ -241,8 +245,6 @@ uint32_t cirque_gen_6_read_callback(uint32_t trigger_time, void *cb_arg) {
         ptp_report.ts            = packet[9] << 8 | packet[10];
         ptp_report.contact_count = packet[11];
         ptp_report.buttons       = packet[12];
-
-        has_motion = 1;
     }
 #endif
 #if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
@@ -250,13 +252,12 @@ uint32_t cirque_gen_6_read_callback(uint32_t trigger_time, void *cb_arg) {
         ptp_report.buttons           = packet[3];
         ptp_report.xDelta            = packet[4];
         ptp_report.yDelta            = packet[5];
-        amree ptp_report.scrollDelta = packet[6];
+        ptp_report.scrollDelta = packet[6];
         ptp_report.panDelta          = packet[7];
 
         has_motion = 1;
     }
 #endif
-    return NAVIGATOR_TRACKPAD_READ;
 }
 
 void dump_ptp_report(void) {
@@ -273,33 +274,33 @@ void dump_ptp_report(void) {
 #endif
 }
 
+// Check if the DR pin is asserted, if it is there is motion data to sample.
+uint8_t cirque_gen6_has_motion(void) {
+    return cirque_gen6_read_reg(CGEN6_I2C_DR);
+}
+
+uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg) {
+    if (!trackpad_init) {
+        navigator_trackpad_device_init();
+        printf("Re-init\n");
+        return NAVIGATOR_TRACKPAD_PROBE;
+    }
+    if (cirque_gen6_has_motion()) {
+        has_motion = 1;
+        cirque_gen_6_read_report();
+    }
+    return NAVIGATOR_TRACKPAD_READ;
+}
+
 void navigator_trackpad_device_init(void) {
     i2c_init();
-
     i2c_status_t status = i2c_ping_address(NAVIGATOR_TRACKPAD_ADDRESS, NAVIGATOR_TRACKPAD_TIMEOUT);
-
     if (status != I2C_STATUS_SUCCESS) {
-        printf("Failed to ping touchpad\n");
-        touchpad_init = false;
+        trackpad_init = false;
         return;
     }
-
     cirque_gen6_clear();
-
     wait_ms(50);
-
-    uint8_t resSize = cirque_gen6_write_reg(0x2001080C, 16);
-    resSize         = cirque_gen6_write_reg(0x2001080D, 16);
-
-    if (resSize != CGEN6_SUCCESS) {
-        printf("Failed to set touchpad size\n");
-    }
-
-    uint8_t sizeX = cirque_gen6_read_reg(0x2001080C);
-    uint8_t sizeY = cirque_gen6_read_reg(0x2001080D);
-
-    printf("Touchpad size: %d x %d\n", sizeX, sizeY);
-
 #if defined(NAVIGATOR_TRACKPAD_DEBUG)
     uint8_t  hardwareId  = cirque_gen6_read_reg(CGEN6_HARDWARE_ID);
     uint8_t  firmwareId  = cirque_gen6_read_reg(CGEN6_FIRMWARE_ID);
@@ -345,19 +346,21 @@ void navigator_trackpad_device_init(void) {
     cirque_gen6_invert_y(true);
     cirque_gen6_enable_logical_scaling(true);
 
-    touchpad_init = true;
-    defer_exec(NAVIGATOR_TRACKPAD_READ, cirque_gen_6_read_callback, NULL);
+    trackpad_init = true;
+    // Only register the callback for the first time
+    if (!callback_token) {
+        callback_token = defer_exec(NAVIGATOR_TRACKPAD_READ, cirque_gen6_read_callback, NULL);
+    }
 }
 
 report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
-    if (!has_motion || !touchpad_init) {
+    if (!has_motion || !trackpad_init) {
         if (prev_tap_clear) {
             prev_tap_clear       = false;
             mouse_report.buttons = 0;
         }
         return mouse_report;
     }
-
 #if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
     mouse_report.x       = ptp_report.xDelta;
     mouse_report.y       = ptp_report.yDelta;
@@ -376,12 +379,10 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         prev_ptp_flag = false;
         if (in_motion == false) { // Register a tap or double tap
             if (last_contact_count > 0) {
-                print("Double tap detected\n");
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_DOUBLE_TAP
                 mouse_report.buttons = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON2);
 #    endif
             } else {
-                print("Single tap detected\n");
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_TAP
                 mouse_report.buttons = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON1);
 #    endif

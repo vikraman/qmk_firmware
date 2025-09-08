@@ -56,7 +56,7 @@ void cirque_gen6_clear(void) {
     }
 }
 
-uint8_t cirque_gen6_read_memory(uint32_t addr, uint8_t *data, uint16_t cnt) {
+uint8_t cirque_gen6_read_memory(uint32_t addr, uint8_t *data, uint16_t cnt, bool fast_read) {
     uint8_t  cksum = 0;
     uint8_t  res   = CGEN6_SUCCESS;
     uint8_t  len[2];
@@ -84,17 +84,21 @@ uint8_t cirque_gen6_read_memory(uint32_t addr, uint8_t *data, uint16_t cnt) {
         read++;
     }
 
-    // Check the checksum
-    if (cksum != buf[read]) {
-        res |= CGEN6_CKSUM_FAILED;
-    }
+    if (!fast_read) {
+        // Check the checksum
+        if (cksum != buf[read]) {
+            res |= CGEN6_CKSUM_FAILED;
+        }
 
-    // Check the length (incremented first to account for the checksum)
-    if (++read != (len[0] | (len[1] << 8))) {
-        res |= CGEN6_LEN_MISMATCH;
-    }
+        // Check the length (incremented first to account for the checksum)
+        if (++read != (len[0] | (len[1] << 8))) {
+            res |= CGEN6_LEN_MISMATCH;
+        }
 
-    wait_ms(1);
+        wait_ms(1);
+    } else {
+        wait_us(250);
+    }
 
     return res;
 }
@@ -126,9 +130,9 @@ uint8_t cirque_gen6_write_memory(uint32_t addr, uint8_t *data, uint16_t cnt) {
     return res;
 }
 
-uint8_t cirque_gen6_read_reg(uint32_t addr) {
+uint8_t cirque_gen6_read_reg(uint32_t addr, bool fast_read) {
     uint8_t data;
-    uint8_t res = cirque_gen6_read_memory(addr, &data, 1);
+    uint8_t res = cirque_gen6_read_memory(addr, &data, 1, fast_read);
     if (res != CGEN6_SUCCESS) {
         printf("Failed to read 8bits from register at address 0x%08X with error 0x%02X\n", (u_int)addr, res);
         return 0;
@@ -138,7 +142,7 @@ uint8_t cirque_gen6_read_reg(uint32_t addr) {
 
 uint16_t cirque_gen6_read_reg_16(uint32_t addr) {
     uint8_t buf[2];
-    uint8_t res = cirque_gen6_read_memory(addr, buf, 2);
+    uint8_t res = cirque_gen6_read_memory(addr, buf, 2, false);
     if (res != CGEN6_SUCCESS) {
         printf("Failed to read 16bits from register at address 0x%08X with error 0x%02X\n", (u_int)addr, res);
         return 0;
@@ -148,7 +152,7 @@ uint16_t cirque_gen6_read_reg_16(uint32_t addr) {
 
 uint32_t cirque_gen6_read_reg_32(uint32_t addr) {
     uint8_t buf[4];
-    uint8_t res = cirque_gen6_read_memory(addr, buf, 4);
+    uint8_t res = cirque_gen6_read_memory(addr, buf, 4, false);
     if (res != CGEN6_SUCCESS) {
         printf("Failed to read 32bits from register at address 0x%08X with error 0x%02X\n", (u_int)addr, res);
         return 0;
@@ -171,20 +175,20 @@ uint8_t cirque_gen6_write_reg_32(uint32_t addr, uint32_t data) {
 }
 
 uint8_t cirque_gen6_set_relative_mode(void) {
-    uint8_t feed_config4 = cirque_gen6_read_reg(CGEN6_FEED_CONFIG4);
+    uint8_t feed_config4 = cirque_gen6_read_reg(CGEN6_FEED_CONFIG4, false);
     feed_config4 &= 0xF3;
     return cirque_gen6_write_reg(CGEN6_FEED_CONFIG4, feed_config4);
 }
 
 uint8_t cirque_gen6_set_ptp_mode(void) {
-    uint8_t feed_config4 = cirque_gen6_read_reg(CGEN6_FEED_CONFIG4);
+    uint8_t feed_config4 = cirque_gen6_read_reg(CGEN6_FEED_CONFIG4, false);
     feed_config4 &= 0xF7;
     feed_config4 |= 0x04;
     return cirque_gen6_write_reg(CGEN6_FEED_CONFIG4, feed_config4);
 }
 
 uint8_t cirque_gen6_swap_xy(bool set) {
-    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG);
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
     if (set) {
         xy_config |= 0x04;
     } else {
@@ -194,7 +198,7 @@ uint8_t cirque_gen6_swap_xy(bool set) {
 }
 
 uint8_t cirque_gen6_invert_y(bool set) {
-    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG);
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
     if (set) {
         xy_config |= 0x02;
     } else {
@@ -204,7 +208,7 @@ uint8_t cirque_gen6_invert_y(bool set) {
 }
 
 uint8_t cirque_gen6_invert_x(bool set) {
-    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG);
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
     if (set) {
         xy_config |= 0x01;
     } else {
@@ -214,7 +218,7 @@ uint8_t cirque_gen6_invert_x(bool set) {
 }
 
 uint8_t cirque_gen6_enable_logical_scaling(bool set) {
-    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG);
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
     if (set) {
         xy_config &= ~0x08;
     } else {
@@ -276,7 +280,7 @@ void dump_ptp_report(void) {
 
 // Check if the DR pin is asserted, if it is there is motion data to sample.
 uint8_t cirque_gen6_has_motion(void) {
-    return cirque_gen6_read_reg(CGEN6_I2C_DR);
+    return cirque_gen6_read_reg(CGEN6_I2C_DR, true);
 }
 
 uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg) {
@@ -286,6 +290,7 @@ uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg) {
         return NAVIGATOR_TRACKPAD_PROBE;
     }
     if (cirque_gen6_has_motion()) {
+        printf("has_motion\n");
         has_motion = 1;
         cirque_gen_6_read_report();
     }
@@ -302,8 +307,8 @@ void navigator_trackpad_device_init(void) {
     cirque_gen6_clear();
     wait_ms(50);
 #if defined(NAVIGATOR_TRACKPAD_DEBUG)
-    uint8_t  hardwareId  = cirque_gen6_read_reg(CGEN6_HARDWARE_ID);
-    uint8_t  firmwareId  = cirque_gen6_read_reg(CGEN6_FIRMWARE_ID);
+    uint8_t  hardwareId  = cirque_gen6_read_reg(CGEN6_HARDWARE_ID, false);
+    uint8_t  firmwareId  = cirque_gen6_read_reg(CGEN6_FIRMWARE_ID, false);
     uint16_t vendorId    = cirque_gen6_read_reg_16(CGEN6_VENDOR_ID);
     uint16_t productId   = cirque_gen6_read_reg_16(CGEN6_PRODUCT_ID);
     uint16_t versionId   = cirque_gen6_read_reg_16(CGEN6_FIRMWARE_REV);

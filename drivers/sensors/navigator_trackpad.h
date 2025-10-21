@@ -90,12 +90,16 @@
 #        define MOUSE_EXTENDED_REPORT
 #    endif
 typedef struct {
-    uint16_t x;
-    uint16_t y;
-    uint16_t ts;
     uint8_t  id;
     uint8_t  confidence;
     uint8_t  tip;
+    uint16_t x;
+    uint16_t y;
+} cgen6_finger_t;
+
+typedef struct {
+    cgen6_finger_t fingers[2];
+    uint16_t ts;
     uint8_t  contact_count;
     uint8_t  buttons;
 } cgen6_report_t;

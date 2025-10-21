@@ -30,10 +30,25 @@ bool        trackpad_init;
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 cgen6_report_t ptp_report;
 bool           prev_ptp_flag, prev_tap_clear = false;
-uint8_t        last_contact_count = 0;
+uint8_t        last_finger_count = 0;
 uint16_t       prev_ptp_x, prev_ptp_y;
 uint16_t       tap_timer = 0;
 int16_t        ptp_delta_x, ptp_delta_y;
+#endif
+
+// Helper functions to parse ptp reports
+#if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
+uint8_t finger_count(cgen6_report_t *report) {
+    uint8_t fingers = 0;
+    if (report->fingers[0].x != 0 || report->fingers[0].y != 0) {
+        fingers++;
+    }
+    if (report->fingers[1].x != 0 || report->fingers[1].y != 0) {
+        fingers++;
+    }
+
+    return fingers;
+}
 #endif
 
 i2c_status_t cirque_gen6_read_report(uint8_t *data, uint16_t cnt) {
@@ -241,14 +256,19 @@ void cirque_gen_6_read_report(void) {
     uint8_t report_id = packet[2];
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     if (report_id == CGEN6_PTP_REPORT_ID) {
-        ptp_report.confidence    = packet[3] & 0x01;
-        ptp_report.tip           = (packet[3] & 0x02) >> 1;
-        ptp_report.id            = (packet[3] & 0xFC) >> 2;
-        ptp_report.x             = packet[5] << 8 | packet[4];
-        ptp_report.y             = packet[7] << 8 | packet[6];
-        ptp_report.ts            = packet[9] << 8 | packet[10];
-        ptp_report.contact_count = packet[11];
-        ptp_report.buttons       = packet[12];
+        ptp_report.fingers[0].id            = (packet[3] & 0xFC) >> 2;
+        ptp_report.fingers[0].confidence    = packet[3] & 0x01;
+        ptp_report.fingers[0].tip           = (packet[3] & 0x02) >> 1;
+        ptp_report.fingers[0].x  = packet[5] << 8 | packet[4];
+        ptp_report.fingers[0].y  = packet[7] << 8 | packet[6];
+        ptp_report.fingers[1].id            = (packet[8] & 0xFC) >> 2;
+        ptp_report.fingers[1].confidence    = packet[8] & 0x01;
+        ptp_report.fingers[1].tip           = (packet[8] & 0x02) >> 1;
+        ptp_report.fingers[1].x  = packet[10] << 8 | packet[9];
+        ptp_report.fingers[1].y  = packet[12] << 8 | packet[11];
+        ptp_report.ts       = packet[14] << 8 | packet[13];
+        ptp_report.contact_count = packet[15];
+        ptp_report.buttons       = packet[16];
     }
 #endif
 #if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
@@ -267,14 +287,21 @@ void cirque_gen_6_read_report(void) {
 void dump_ptp_report(void) {
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     printf("PTP Report:\n");
-    printf("  X: %d\n", ptp_report.x);
-    printf("  Y: %d\n", ptp_report.y);
-    printf("  Timestamp: %d\n", ptp_report.ts);
-    printf("  ID: %d\n", ptp_report.id);
-    printf("  Confidence: %d\n", ptp_report.confidence);
-    printf("  Tip: %d\n", ptp_report.tip);
-    printf("  Contact Count: %d\n", ptp_report.contact_count);
-    printf("  Buttons: %d\n", ptp_report.buttons);
+    printf(" ID finger 1: %d\n", ptp_report.fingers[0].id);
+    printf(" Confidence finger 1: %d\n", ptp_report.fingers[0].confidence);
+    printf(" Tip finger 1: %d\n", ptp_report.fingers[0].tip);
+    printf(" X finger 1: %d\n", ptp_report.fingers[0].x);
+    printf(" Y finger 1: %d\n", ptp_report.fingers[0].y);
+    printf(" ID finger 2: %d\n", ptp_report.fingers[1].id);
+    printf(" Confidence finger 2: %d\n", ptp_report.fingers[1].confidence);
+    printf(" Tip finger 2: %d\n", ptp_report.fingers[1].tip);
+    printf(" X finger 2: %d\n", ptp_report.fingers[1].x);
+    printf(" Y finger 2: %d\n", ptp_report.fingers[1].y);
+    printf(" Timestamp: %d\n", ptp_report.ts);
+    printf(" Contact Count: %d\n", ptp_report.contact_count);
+    printf(" Buttons: %d\n", ptp_report.buttons);
+    printf(" Fingers: %d\n", finger_count(&ptp_report));
+    printf(" Last Finger: %d\n", last_finger_count);
 #endif
 }
 
@@ -286,11 +313,9 @@ uint8_t cirque_gen6_has_motion(void) {
 uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg) {
     if (!trackpad_init) {
         navigator_trackpad_device_init();
-        printf("Re-init\n");
         return NAVIGATOR_TRACKPAD_PROBE;
     }
     if (cirque_gen6_has_motion()) {
-        printf("has_motion\n");
         has_motion = 1;
         cirque_gen_6_read_report();
     }
@@ -374,20 +399,20 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
     mouse_report.buttons = ptp_report.buttons;
 #endif
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-    if (!prev_ptp_flag && ptp_report.tip) { // Beginning of a motion
-        prev_ptp_x    = ptp_report.x;
-        prev_ptp_y    = ptp_report.y;
+    if (!prev_ptp_flag && ptp_report.fingers[0].tip) { // Beginning of a motion
+        prev_ptp_x    = ptp_report.fingers[0].x;
+        prev_ptp_y    = ptp_report.fingers[0].y;
         prev_ptp_flag = true;
         tap_timer     = timer_read();
         in_motion     = false;
-    } else if (!ptp_report.tip) { // End of a motion
+    } else if (!ptp_report.fingers[0].tip) { // End of a motion
         prev_ptp_flag = false;
         if (in_motion == false) { // Register a tap or double tap
-            if (last_contact_count > 0) {
+            if (last_finger_count == 2) {
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_DOUBLE_TAP
                 mouse_report.buttons = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON2);
 #    endif
-            } else {
+            } else if (last_finger_count == 1) {
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_TAP
                 mouse_report.buttons = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON1);
 #    endif
@@ -396,11 +421,11 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         }
         set_scrolling = false;
     } else {
-        ptp_delta_x = ptp_report.x - prev_ptp_x;
-        ptp_delta_y = ptp_report.y - prev_ptp_y;
+        ptp_delta_x = ptp_report.fingers[0].x - prev_ptp_x;
+        ptp_delta_y = ptp_report.fingers[0].y - prev_ptp_y;
 
         if (timer_elapsed(tap_timer) >= NAVIGATOR_TRACKPAD_TAP_DEBOUNCE) {
-            if (ptp_report.contact_count > 0) { // More than one finger, return scroll motions
+            if (finger_count(&ptp_report) > 1) { // More than one finger, return scroll motions
                 set_scrolling = true;
             }
 
@@ -415,12 +440,12 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                 mouse_report.y = powf(ptp_delta_y, 1.2);
             }
 
-            prev_ptp_x = ptp_report.x;
-            prev_ptp_y = ptp_report.y;
+            prev_ptp_x = ptp_report.fingers[0].x;
+            prev_ptp_y = ptp_report.fingers[0].y;
 
             in_motion = true;
         }
-        last_contact_count = ptp_report.contact_count;
+        last_finger_count = ptp_report.contact_count;
     }
 #endif
     has_motion = 0;

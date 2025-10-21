@@ -250,7 +250,7 @@ __attribute__((weak)) bool auto_mouse_activation(report_mouse_t mouse_report) {
     auto_mouse_context.total_mouse_movement.y += mouse_report.y;
     auto_mouse_context.total_mouse_movement.h += mouse_report.h;
     auto_mouse_context.total_mouse_movement.v += mouse_report.v;
-    return abs(auto_mouse_context.total_mouse_movement.x) > AUTO_MOUSE_THRESHOLD || abs(auto_mouse_context.total_mouse_movement.y) > AUTO_MOUSE_THRESHOLD || abs(auto_mouse_context.total_mouse_movement.h) > AUTO_MOUSE_SCROLL_THRESHOLD || abs(auto_mouse_context.total_mouse_movement.v) > AUTO_MOUSE_SCROLL_THRESHOLD || mouse_report.buttons;
+    return abs(auto_mouse_context.total_mouse_movement.x) > AUTO_MOUSE_THRESHOLD || abs(auto_mouse_context.total_mouse_movement.y) > AUTO_MOUSE_THRESHOLD || abs(auto_mouse_context.total_mouse_movement.h) > AUTO_MOUSE_SCROLL_THRESHOLD || abs(auto_mouse_context.total_mouse_movement.v) > AUTO_MOUSE_SCROLL_THRESHOLD || (mouse_report.buttons && layer_state_is(AUTO_MOUSE_TARGET_LAYER));
 }
 
 /**
@@ -320,9 +320,6 @@ void auto_mouse_reset_trigger(bool pressed) {
 #ifdef LAYER_LOCK_ENABLE
         if(is_layer_locked(AUTO_MOUSE_DEFAULT_LAYER)) return;
 #endif
-        if (layer_state_is((AUTO_MOUSE_TARGET_LAYER))) {
-            layer_off((AUTO_MOUSE_TARGET_LAYER));
-        };
         auto_mouse_reset();
     }
     auto_mouse_context.timer.delay = timer_read();
@@ -430,7 +427,7 @@ bool process_auto_mouse(uint16_t keycode, keyrecord_t* record) {
             // skip on no event
             if (IS_NOEVENT(record->event)) break;
             // check if keyrecord is mousekey
-            if (is_mouse_record(keycode, record)) {
+            if (is_mouse_record(keycode, record) && is_auto_mouse_active()) {
                 auto_mouse_keyevent(record->event.pressed);
             } else if (!is_auto_mouse_active()) {
                 // all non-mousekey presses restart delay timer and reset status
@@ -462,13 +459,7 @@ bool process_auto_mouse(uint16_t keycode, keyrecord_t* record) {
  */
 static bool is_mouse_record(uint16_t keycode, keyrecord_t* record) {
     // allow for keyboard to hook in and override if need be
-    if (is_mouse_record_kb(keycode, record)) return true;
-
-    // if it's a mouse key, only treat it as a mouse record if we're currently on the auto mouse target layer
-    // this prevents mouse keys from activating the auto mouse layer when pressed on other layers
-    if (IS_MOUSEKEY(keycode)) {
-        return layer_state_is((AUTO_MOUSE_TARGET_LAYER));
-    }
+    if ((is_mouse_record_kb(keycode, record) || IS_MOUSEKEY(keycode))) return true;
 
     return false;
 }

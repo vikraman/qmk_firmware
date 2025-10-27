@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 #    include <stdlib.h>
@@ -459,7 +460,7 @@ bool process_auto_mouse(uint16_t keycode, keyrecord_t* record) {
  */
 static bool is_mouse_record(uint16_t keycode, keyrecord_t* record) {
     // allow for keyboard to hook in and override if need be
-    if ((is_mouse_record_kb(keycode, record) || IS_MOUSEKEY(keycode))) return true;
+    if (is_mouse_record_kb(keycode, record)) return true;
 
     return false;
 }

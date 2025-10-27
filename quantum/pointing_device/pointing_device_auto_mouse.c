@@ -427,7 +427,7 @@ bool process_auto_mouse(uint16_t keycode, keyrecord_t* record) {
             // skip on no event
             if (IS_NOEVENT(record->event)) break;
             // check if keyrecord is mousekey
-            if (is_mouse_record(keycode, record) && is_auto_mouse_active()) {
+            if (is_mouse_record(keycode, record)) {
                 auto_mouse_keyevent(record->event.pressed);
             } else if (!is_auto_mouse_active()) {
                 // all non-mousekey presses restart delay timer and reset status

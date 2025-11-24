@@ -483,7 +483,6 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         // Determine mode based on finger count
         if (fingers >= 2 && gesture.state != TP_SCROLLING) {
             gesture.state = TP_SCROLLING;
-            set_scrolling = true;
         }
 
         uint16_t duration = timer_elapsed(gesture.touch_start_time);
@@ -512,8 +511,33 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             int16_t delta_y = ptp_report.fingers[0].y - gesture.prev_y;
 
             if (delta_x != 0 || delta_y != 0) {
-                mouse_report.x = (delta_x < 0) ? -powf(-delta_x, 1.2) : powf(delta_x, 1.2);
-                mouse_report.y = (delta_y < 0) ? -powf(-delta_y, 1.2) : powf(delta_y, 1.2);
+                if (gesture.state == TP_SCROLLING) {
+                    // Two-finger scroll: output directly to h/v for high-res scrolling
+                    // With high-res scrolling enabled, the OS divides by 120 to get ticks
+                    // Apply multiplier to adjust scroll speed
+                    int16_t scroll_x = delta_x * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
+                    int16_t scroll_y = delta_y * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
+
+                    // Clamp to int8_t range for the report
+                    scroll_x = (scroll_x > 127) ? 127 : ((scroll_x < -127) ? -127 : scroll_x);
+                    scroll_y = (scroll_y > 127) ? 127 : ((scroll_y < -127) ? -127 : scroll_y);
+
+#    ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+                    if (scroll_x != 0 || scroll_y != 0) {
+                        printf("SCROLL: delta=%d,%d *%d -> h=%d v=%d\n",
+                               delta_x, delta_y, NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER, -scroll_x, scroll_y);
+                    }
+#    endif
+
+                    mouse_report.h = -scroll_x;  // Invert for natural scrolling
+                    mouse_report.v = scroll_y;
+                    mouse_report.x = 0;
+                    mouse_report.y = 0;
+                } else {
+                    // One-finger movement: mouse cursor
+                    mouse_report.x = (delta_x < 0) ? -powf(-delta_x, 1.2) : powf(delta_x, 1.2);
+                    mouse_report.y = (delta_y < 0) ? -powf(-delta_y, 1.2) : powf(delta_y, 1.2);
+                }
             }
         }
 

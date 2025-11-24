@@ -29,6 +29,9 @@ bool        trackpad_init;
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 cgen6_report_t      ptp_report;
 trackpad_gesture_t  gesture = {0};
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+scroll_inertia_t    scroll_inertia = {0};
+#    endif
 #endif
 
 // Helper functions to parse ptp reports
@@ -385,6 +388,53 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         mouse_report.buttons  = 0;
         return mouse_report;
     }
+
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+    // Process scroll inertia when active
+    if (scroll_inertia.active && timer_elapsed(scroll_inertia.timer) >= NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL) {
+        scroll_inertia.timer = timer_read();
+
+        // Apply friction to velocity (Q8 fixed point math)
+        // Friction reduces velocity towards zero
+        int16_t friction_x = (scroll_inertia.vx * NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION) / 256;
+        int16_t friction_y = (scroll_inertia.vy * NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION) / 256;
+
+        // Ensure we always reduce by at least 1 if not zero
+        if (scroll_inertia.vx > 0 && friction_x < 1) friction_x = 1;
+        if (scroll_inertia.vx < 0 && friction_x > -1) friction_x = -1;
+        if (scroll_inertia.vy > 0 && friction_y < 1) friction_y = 1;
+        if (scroll_inertia.vy < 0 && friction_y > -1) friction_y = -1;
+
+        scroll_inertia.vx -= friction_x;
+        scroll_inertia.vy -= friction_y;
+
+        // Convert Q8 velocity to scroll value
+        int16_t scroll_x = (scroll_inertia.vx * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER) / 256;
+        int16_t scroll_y = (scroll_inertia.vy * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER) / 256;
+
+        // Clamp to int8_t range
+        scroll_x = (scroll_x > 127) ? 127 : ((scroll_x < -127) ? -127 : scroll_x);
+        scroll_y = (scroll_y > 127) ? 127 : ((scroll_y < -127) ? -127 : scroll_y);
+
+        // Check if velocity is too low to continue
+        int16_t abs_vx = scroll_inertia.vx < 0 ? -scroll_inertia.vx : scroll_inertia.vx;
+        int16_t abs_vy = scroll_inertia.vy < 0 ? -scroll_inertia.vy : scroll_inertia.vy;
+        if (abs_vx < 64 && abs_vy < 64) {  // Threshold in Q8 (0.25 in real units)
+            scroll_inertia.active = false;
+#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+            printf("INERTIA STOP\n");
+#        endif
+        } else {
+#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+            printf("INERTIA: vx=%d vy=%d -> h=%d v=%d\n",
+                   scroll_inertia.vx, scroll_inertia.vy, -scroll_x, scroll_y);
+#        endif
+            mouse_report.h = -scroll_x;  // Invert for natural scrolling
+            mouse_report.v = scroll_y;
+            return mouse_report;
+        }
+    }
+#    endif
 #endif
 
     if (!has_motion || !trackpad_init) {
@@ -414,6 +464,12 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         gesture.settled          = false;
         gesture.max_finger_count = fingers;
         gesture.state            = TP_MOVING;
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+        // Stop any ongoing scroll inertia when finger touches
+        scroll_inertia.active  = false;
+        scroll_inertia.last_dx = 0;
+        scroll_inertia.last_dy = 0;
+#    endif
     }
 
     // Handle finger up - evaluate tap at lift time (libinput style)
@@ -469,6 +525,24 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         }
 #    endif
 
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+        // Start scroll inertia if we were scrolling and have enough velocity
+        if (gesture.state == TP_SCROLLING) {
+            int16_t abs_vx = scroll_inertia.last_dx < 0 ? -scroll_inertia.last_dx : scroll_inertia.last_dx;
+            int16_t abs_vy = scroll_inertia.last_dy < 0 ? -scroll_inertia.last_dy : scroll_inertia.last_dy;
+            if (abs_vx >= NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER ||
+                abs_vy >= NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER) {
+                scroll_inertia.vx     = scroll_inertia.last_dx * 256;  // Q8 fixed point
+                scroll_inertia.vy     = scroll_inertia.last_dy * 256;
+                scroll_inertia.timer  = timer_read();
+                scroll_inertia.active = true;
+#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+                printf("INERTIA START: vx=%d vy=%d\n", scroll_inertia.vx, scroll_inertia.vy);
+#        endif
+            }
+        }
+#    endif
+
         gesture.state = TP_IDLE;
         set_scrolling = false;
     }
@@ -517,6 +591,12 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                     // Apply multiplier to adjust scroll speed
                     int16_t scroll_x = delta_x * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
                     int16_t scroll_y = delta_y * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
+
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+                    // Track velocity for inertia (store pre-multiplied deltas)
+                    scroll_inertia.last_dx = delta_x;
+                    scroll_inertia.last_dy = delta_y;
+#    endif
 
                     // Clamp to int8_t range for the report
                     scroll_x = (scroll_x > 127) ? 127 : ((scroll_x < -127) ? -127 : scroll_x);

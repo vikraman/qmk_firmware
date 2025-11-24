@@ -104,6 +104,37 @@
 #    define NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER 4
 #endif
 
+// Scroll inertia configuration
+/*
+To enable, add to your config.h:
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+
+Configurable values (all optional):
+- NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION - Higher = stops faster (default: 50, range 1-255)
+- NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL - Time between glide reports in ms (default: 15)
+- NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER - Minimum velocity to trigger glide (default: 3)
+*/
+#ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+#    ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION
+#        define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION 50  // Higher = stops faster (1-255)
+#    endif
+#    ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL
+#        define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL 15  // Glide report interval in ms
+#    endif
+#    ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER
+#        define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 3    // Min velocity to trigger glide
+#    endif
+
+typedef struct {
+    int16_t  vx;           // Current X velocity (Q8 fixed point)
+    int16_t  vy;           // Current Y velocity (Q8 fixed point)
+    int16_t  last_dx;      // Last scroll delta X
+    int16_t  last_dy;      // Last scroll delta Y
+    uint16_t timer;        // Timer for interval tracking
+    bool     active;       // Is glide currently active
+} scroll_inertia_t;
+#endif
+
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 #    ifndef MOUSE_EXTENDED_REPORT
 #        define MOUSE_EXTENDED_REPORT

@@ -24,16 +24,11 @@ uint16_t    current_cpi = DEFAULT_CPI_TICK;
 uint32_t    gpio_offset_addr;
 uint8_t     has_motion = 0;
 extern bool set_scrolling;
-bool        in_motion;
 bool        trackpad_init;
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-cgen6_report_t ptp_report;
-bool           prev_ptp_flag, prev_tap_clear = false;
-uint8_t        last_finger_count = 0;
-uint16_t       prev_ptp_x, prev_ptp_y;
-uint16_t       tap_timer = 0;
-int16_t        ptp_delta_x, ptp_delta_y;
+cgen6_report_t      ptp_report;
+trackpad_gesture_t  gesture = {0};
 #endif
 
 // Helper functions to parse ptp reports
@@ -301,7 +296,6 @@ void dump_ptp_report(void) {
     printf(" Contact Count: %d\n", ptp_report.contact_count);
     printf(" Buttons: %d\n", ptp_report.buttons);
     printf(" Fingers: %d\n", finger_count(&ptp_report));
-    printf(" Last Finger: %d\n", last_finger_count);
 #endif
 }
 
@@ -384,13 +378,19 @@ void navigator_trackpad_device_init(void) {
 }
 
 report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
-    if (!has_motion || !trackpad_init) {
-        if (prev_tap_clear) {
-            prev_tap_clear       = false;
-            mouse_report.buttons = 0;
-        }
+#if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
+    // Handle pending click release from previous cycle
+    if (gesture.pending_click) {
+        gesture.pending_click = false;
+        mouse_report.buttons  = 0;
         return mouse_report;
     }
+#endif
+
+    if (!has_motion || !trackpad_init) {
+        return mouse_report;
+    }
+
 #if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
     mouse_report.x       = ptp_report.xDelta;
     mouse_report.y       = ptp_report.yDelta;
@@ -398,56 +398,130 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
     mouse_report.h       = ptp_report.panDelta;
     mouse_report.buttons = ptp_report.buttons;
 #endif
+
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-    if (!prev_ptp_flag && ptp_report.fingers[0].tip) { // Beginning of a motion
-        prev_ptp_x    = ptp_report.fingers[0].x;
-        prev_ptp_y    = ptp_report.fingers[0].y;
-        prev_ptp_flag = true;
-        tap_timer     = timer_read();
-        in_motion     = false;
-    } else if (!ptp_report.fingers[0].tip) { // End of a motion
-        prev_ptp_flag = false;
-        if (in_motion == false) { // Register a tap or double tap
-            if (last_finger_count == 2) {
+    uint8_t fingers     = finger_count(&ptp_report);
+    bool    is_touching = ptp_report.fingers[0].tip;
+    bool    was_idle    = (gesture.state == TP_IDLE);
+
+    // Handle finger down - record start position (regardless of current state)
+    if (is_touching && was_idle) {
+        gesture.touch_start_time = timer_read();
+        gesture.prev_x           = ptp_report.fingers[0].x;
+        gesture.prev_y           = ptp_report.fingers[0].y;
+        gesture.settled_x        = 0;  // Will be set after settle time
+        gesture.settled_y        = 0;
+        gesture.settled          = false;
+        gesture.max_finger_count = fingers;
+        gesture.state            = TP_MOVING;
+    }
+
+    // Handle finger up - evaluate tap at lift time (libinput style)
+    if (!is_touching && !was_idle) {
+        uint16_t duration = timer_elapsed(gesture.touch_start_time);
+
+        // Calculate distance from settled position (or treat as no movement if never settled)
+        int32_t dist_sq = 0;
+        if (gesture.settled) {
+            int16_t dx = gesture.prev_x - gesture.settled_x;
+            int16_t dy = gesture.prev_y - gesture.settled_y;
+            dist_sq    = (int32_t)dx * dx + (int32_t)dy * dy;
+        }
+
+#    ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+        printf("LIFT: state=%d, fingers=%d, dist_sq=%ld, duration=%dms, settled=%d\n",
+               gesture.state, gesture.max_finger_count, (long)dist_sq, duration, gesture.settled);
+#    endif
+
+        // Check tap conditions: short duration AND small movement from settled position
+        bool is_tap = (duration <= NAVIGATOR_TRACKPAD_TAP_TIMEOUT) &&
+                      (dist_sq <= NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
+
+        if (is_tap) {
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_DOUBLE_TAP
-                mouse_report.buttons = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON2);
+            if (gesture.max_finger_count >= 2) {
+#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+                printf("  -> RIGHT CLICK\n");
+#        endif
+                mouse_report.x        = 0;
+                mouse_report.y        = 0;
+                mouse_report.buttons  = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON2);
+                gesture.pending_click = true;
+            } else
 #    endif
-            } else if (last_finger_count == 1) {
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_TAP
-                mouse_report.buttons = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON1);
+            if (gesture.max_finger_count == 1) {
+#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+                printf("  -> LEFT CLICK\n");
+#        endif
+                mouse_report.x        = 0;
+                mouse_report.y        = 0;
+                mouse_report.buttons  = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON1);
+                gesture.pending_click = true;
+            }
 #    endif
-            }
-            prev_tap_clear = true;
         }
+#    ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+        else {
+            printf("  -> NO TAP (duration=%d/%d, dist=%ld/%d)\n",
+                   duration, NAVIGATOR_TRACKPAD_TAP_TIMEOUT,
+                   (long)dist_sq, NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
+        }
+#    endif
+
+        gesture.state = TP_IDLE;
         set_scrolling = false;
-    } else {
-        ptp_delta_x = ptp_report.fingers[0].x - prev_ptp_x;
-        ptp_delta_y = ptp_report.fingers[0].y - prev_ptp_y;
+    }
 
-        if (timer_elapsed(tap_timer) >= NAVIGATOR_TRACKPAD_TAP_DEBOUNCE) {
-            if (finger_count(&ptp_report) > 1) { // More than one finger, return scroll motions
-                set_scrolling = true;
-            }
-
-            if (ptp_delta_x < 0) {
-                mouse_report.x = -powf(-ptp_delta_x, 1.2);
-            } else {
-                mouse_report.x = powf(ptp_delta_x, 1.2);
-            }
-            if (ptp_delta_y < 0) {
-                mouse_report.y = -powf(-ptp_delta_y, 1.2);
-            } else {
-                mouse_report.y = powf(ptp_delta_y, 1.2);
-            }
-
-            prev_ptp_x = ptp_report.fingers[0].x;
-            prev_ptp_y = ptp_report.fingers[0].y;
-
-            in_motion = true;
+    // Handle ongoing touch - movement and scrolling
+    if (is_touching && !was_idle) {
+        // Track max fingers during gesture
+        if (fingers > gesture.max_finger_count) {
+            gesture.max_finger_count = fingers;
         }
-        last_finger_count = ptp_report.contact_count;
+
+        // Determine mode based on finger count
+        if (fingers >= 2 && gesture.state != TP_SCROLLING) {
+            gesture.state = TP_SCROLLING;
+            set_scrolling = true;
+        }
+
+        uint16_t duration = timer_elapsed(gesture.touch_start_time);
+
+        // Record settled position once settle time elapses
+        if (!gesture.settled && duration >= NAVIGATOR_TRACKPAD_TAP_SETTLE_TIME) {
+            gesture.settled   = true;
+            gesture.settled_x = ptp_report.fingers[0].x;
+            gesture.settled_y = ptp_report.fingers[0].y;
+        }
+
+        // Check if we should suppress movement (might still be a tap)
+        int32_t dist_sq = 0;
+        if (gesture.settled) {
+            int16_t dx = ptp_report.fingers[0].x - gesture.settled_x;
+            int16_t dy = ptp_report.fingers[0].y - gesture.settled_y;
+            dist_sq    = (int32_t)dx * dx + (int32_t)dy * dy;
+        }
+
+        // Only report movement if: timeout exceeded OR moved beyond tap threshold (after settling)
+        bool should_move = (duration > NAVIGATOR_TRACKPAD_TAP_TIMEOUT) ||
+                           (gesture.settled && dist_sq > NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
+
+        if (should_move) {
+            int16_t delta_x = ptp_report.fingers[0].x - gesture.prev_x;
+            int16_t delta_y = ptp_report.fingers[0].y - gesture.prev_y;
+
+            if (delta_x != 0 || delta_y != 0) {
+                mouse_report.x = (delta_x < 0) ? -powf(-delta_x, 1.2) : powf(delta_x, 1.2);
+                mouse_report.y = (delta_y < 0) ? -powf(-delta_y, 1.2) : powf(delta_y, 1.2);
+            }
+        }
+
+        gesture.prev_x = ptp_report.fingers[0].x;
+        gesture.prev_y = ptp_report.fingers[0].y;
     }
 #endif
+
     has_motion = 0;
     return mouse_report;
 }

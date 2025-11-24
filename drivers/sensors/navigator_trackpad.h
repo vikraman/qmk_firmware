@@ -31,6 +31,21 @@
 #define NAVIGATOR_TRACKPAD_TAPPING_TERM 100
 #define NAVIGATOR_TRACKPAD_TAP_DEBOUNCE 100
 
+#ifndef NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD
+#    define NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD 100  // Max movement (squared) before tap becomes a drag
+#endif
+
+#ifndef NAVIGATOR_TRACKPAD_TAP_TIMEOUT
+#    define NAVIGATOR_TRACKPAD_TAP_TIMEOUT 200  // Max duration (ms) for a tap
+#endif
+
+#ifndef NAVIGATOR_TRACKPAD_TAP_SETTLE_TIME
+#    define NAVIGATOR_TRACKPAD_TAP_SETTLE_TIME 30  // Ignore movement during initial contact (ms)
+#endif
+
+// Uncomment to enable gesture debug output
+// #define NAVIGATOR_TRACKPAD_GESTURE_DEBUG
+
 #ifndef NAVIGATOR_TRACKPAD_ADDRESS
 #    define NAVIGATOR_TRACKPAD_ADDRESS 0x58
 #endif
@@ -103,6 +118,25 @@ typedef struct {
     uint8_t  contact_count;
     uint8_t  buttons;
 } cgen6_report_t;
+
+// Trackpad gesture state machine
+typedef enum {
+    TP_IDLE,        // No fingers touching
+    TP_MOVING,      // One finger movement = mouse cursor
+    TP_SCROLLING,   // Two finger movement = scroll
+} trackpad_state_t;
+
+typedef struct {
+    trackpad_state_t state;
+    uint16_t         touch_start_time;  // When finger first touched
+    uint16_t         settled_x;         // Position after settle time (for tap threshold)
+    uint16_t         settled_y;
+    uint16_t         prev_x;            // Previous position (for delta calculation)
+    uint16_t         prev_y;
+    uint8_t          max_finger_count;  // Max fingers seen during this gesture
+    bool             settled;           // Has the settle time elapsed?
+    bool             pending_click;     // Need to send a click release next cycle
+} trackpad_gesture_t;
 #endif
 
 #if defined(NAVIGATOR_TRACKPAD_ABSOLUTE_MODE)

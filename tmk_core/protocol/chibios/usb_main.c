@@ -289,8 +289,30 @@ static bool usb_requests_hook_cb(USBDriver *usbp) {
 #if defined(SHARED_EP_ENABLE) && !defined(KEYBOARD_SHARED_EP)
                             case SHARED_INTERFACE:
 #endif
+                            {
+                                uint8_t report_type = setup->wValue.hbyte;
+#if defined(POINTING_DEVICE_HIRES_SCROLL_ENABLE)
+                                // Feature report (type 3) is used for Resolution Multiplier
+                                if (report_type == 3) {
+                                    // Accept SET_REPORT for Resolution Multiplier feature report
+                                    // The host sets this to enable high-resolution scrolling
+                                    usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), NULL);
+                                    return true;
+                                }
+#endif
+                                // Output report (type 2) is used for keyboard LEDs
                                 usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), set_led_transfer_cb);
                                 return true;
+                            }
+#if defined(MOUSE_ENABLE) && !defined(MOUSE_SHARED_EP)
+                            case MOUSE_INTERFACE:
+#    if defined(POINTING_DEVICE_HIRES_SCROLL_ENABLE)
+                                // Accept SET_REPORT for Resolution Multiplier feature report
+                                usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), NULL);
+                                return true;
+#    endif
+                                break;
+#endif
                         }
                         break;
                     case HID_REQ_SetProtocol:

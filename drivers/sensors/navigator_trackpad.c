@@ -466,9 +466,9 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         gesture.state            = TP_MOVING;
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
         // Stop any ongoing scroll inertia when finger touches
-        scroll_inertia.active  = false;
-        scroll_inertia.last_dx = 0;
-        scroll_inertia.last_dy = 0;
+        scroll_inertia.active    = false;
+        scroll_inertia.smooth_vx = 0;
+        scroll_inertia.smooth_vy = 0;
 #    endif
     }
 
@@ -528,12 +528,14 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
         // Start scroll inertia if we were scrolling and have enough velocity
         if (gesture.state == TP_SCROLLING) {
-            int16_t abs_vx = scroll_inertia.last_dx < 0 ? -scroll_inertia.last_dx : scroll_inertia.last_dx;
-            int16_t abs_vy = scroll_inertia.last_dy < 0 ? -scroll_inertia.last_dy : scroll_inertia.last_dy;
-            if (abs_vx >= NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER ||
-                abs_vy >= NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER) {
-                scroll_inertia.vx     = scroll_inertia.last_dx * 256;  // Q8 fixed point
-                scroll_inertia.vy     = scroll_inertia.last_dy * 256;
+            // Use smoothed velocity (already in Q8 format)
+            int16_t abs_vx = scroll_inertia.smooth_vx < 0 ? -scroll_inertia.smooth_vx : scroll_inertia.smooth_vx;
+            int16_t abs_vy = scroll_inertia.smooth_vy < 0 ? -scroll_inertia.smooth_vy : scroll_inertia.smooth_vy;
+            // Trigger threshold is now in Q8 (multiply by 256)
+            if (abs_vx >= (NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER * 256) ||
+                abs_vy >= (NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER * 256)) {
+                scroll_inertia.vx     = scroll_inertia.smooth_vx;
+                scroll_inertia.vy     = scroll_inertia.smooth_vy;
                 scroll_inertia.timer  = timer_read();
                 scroll_inertia.active = true;
 #        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
@@ -593,9 +595,31 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                     int16_t scroll_y = delta_y * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
 
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
-                    // Track velocity for inertia (store pre-multiplied deltas)
-                    scroll_inertia.last_dx = delta_x;
-                    scroll_inertia.last_dy = delta_y;
+                    // Track velocity for inertia using exponential smoothing (Q8 fixed point)
+                    // Alpha = 0.3 (77/256) - balances responsiveness with smoothness
+                    // When direction changes, reset smoothing to avoid fighting old momentum
+                    int16_t new_vx = delta_x * 256;
+                    int16_t new_vy = delta_y * 256;
+
+                    // Detect direction change (signs differ and both non-zero)
+                    bool dir_change_x = (scroll_inertia.smooth_vx > 0 && new_vx < 0) ||
+                                        (scroll_inertia.smooth_vx < 0 && new_vx > 0);
+                    bool dir_change_y = (scroll_inertia.smooth_vy > 0 && new_vy < 0) ||
+                                        (scroll_inertia.smooth_vy < 0 && new_vy > 0);
+
+                    if (dir_change_x) {
+                        // Direction changed - blend toward zero first, then pick up new direction
+                        scroll_inertia.smooth_vx = (scroll_inertia.smooth_vx * 128 + new_vx * 128) / 256;
+                    } else {
+                        // Same direction - normal EMA smoothing
+                        scroll_inertia.smooth_vx = (scroll_inertia.smooth_vx * 179 + new_vx * 77) / 256;
+                    }
+
+                    if (dir_change_y) {
+                        scroll_inertia.smooth_vy = (scroll_inertia.smooth_vy * 128 + new_vy * 128) / 256;
+                    } else {
+                        scroll_inertia.smooth_vy = (scroll_inertia.smooth_vy * 179 + new_vy * 77) / 256;
+                    }
 #    endif
 
                     // Clamp to int8_t range for the report

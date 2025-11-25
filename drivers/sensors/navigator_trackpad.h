@@ -128,8 +128,8 @@ Configurable values (all optional):
 typedef struct {
     int16_t  vx;           // Current X velocity (Q8 fixed point)
     int16_t  vy;           // Current Y velocity (Q8 fixed point)
-    int16_t  last_dx;      // Last scroll delta X
-    int16_t  last_dy;      // Last scroll delta Y
+    int16_t  smooth_vx;    // Smoothed X velocity (Q8 fixed point)
+    int16_t  smooth_vy;    // Smoothed Y velocity (Q8 fixed point)
     uint16_t timer;        // Timer for interval tracking
     bool     active;       // Is glide currently active
 } scroll_inertia_t;

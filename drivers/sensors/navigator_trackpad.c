@@ -52,7 +52,6 @@ uint8_t finger_count(cgen6_report_t *report) {
 i2c_status_t cirque_gen6_read_report(uint8_t *data, uint16_t cnt) {
     i2c_status_t res = i2c_receive(NAVIGATOR_TRACKPAD_ADDRESS, data, cnt, NAVIGATOR_TRACKPAD_TIMEOUT);
     if (res != I2C_STATUS_SUCCESS) {
-        trackpad_init = false;
         return res;
     }
     wait_us(cnt * 15);
@@ -328,7 +327,6 @@ void navigator_trackpad_device_init(void) {
     }
     cirque_gen6_clear();
     wait_ms(50);
-#if defined(NAVIGATOR_TRACKPAD_DEBUG)
     uint8_t  hardwareId  = cirque_gen6_read_reg(CGEN6_HARDWARE_ID, false);
     uint8_t  firmwareId  = cirque_gen6_read_reg(CGEN6_FIRMWARE_ID, false);
     uint16_t vendorId    = cirque_gen6_read_reg_16(CGEN6_VENDOR_ID);
@@ -351,7 +349,6 @@ void navigator_trackpad_device_init(void) {
     printf("Touchpad Uncommitted Version: %s\n", uncommittedVersion ? "true" : "false");
     printf("Touchpad Branch Version: %s\n", branchVersion ? "true" : "false");
     printf("Touchpad Developer ID: %d\n", developerId);
-#endif
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     uint8_t res = cirque_gen6_set_ptp_mode();

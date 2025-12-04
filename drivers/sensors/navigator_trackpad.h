@@ -43,9 +43,6 @@
 #    define NAVIGATOR_TRACKPAD_TAP_SETTLE_TIME 30  // Ignore movement during initial contact (ms)
 #endif
 
-// Uncomment to enable gesture debug output
-// #define NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-
 #ifndef NAVIGATOR_TRACKPAD_ADDRESS
 #    define NAVIGATOR_TRACKPAD_ADDRESS 0x58
 #endif
@@ -101,8 +98,16 @@
 #endif
 
 #ifndef NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER
-#    define NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER 4
+#    define NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER 3
 #endif
+
+// Two-finger scrolling (define to enable)
+// #define NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
+
+// Scroll inversion configuration
+// Define these to invert scroll direction on respective axes
+// #define NAVIGATOR_SCROLL_INVERT_X
+// #define NAVIGATOR_SCROLL_INVERT_Y
 
 // Scroll inertia configuration
 /*
@@ -115,15 +120,15 @@ Configurable values (all optional):
 - NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER - Minimum velocity to trigger glide (default: 3)
 */
 #ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
-#    ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION
-#        define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION 50  // Higher = stops faster (1-255)
-#    endif
-#    ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL
-#        define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL 15  // Glide report interval in ms
-#    endif
-#    ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER
-#        define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 3    // Min velocity to trigger glide
-#    endif
+#ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION 5  // Higher = stops faster (1-255)
+#endif
+#ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL 5  // Glide report interval in ms
+#endif
+#ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 1    // Min velocity to trigger glide
+#endif
 
 typedef struct {
     int16_t  vx;           // Current X velocity (Q8 fixed point)

@@ -327,29 +327,6 @@ void navigator_trackpad_device_init(void) {
     }
     cirque_gen6_clear();
     wait_ms(50);
-    uint8_t  hardwareId  = cirque_gen6_read_reg(CGEN6_HARDWARE_ID, false);
-    uint8_t  firmwareId  = cirque_gen6_read_reg(CGEN6_FIRMWARE_ID, false);
-    uint16_t vendorId    = cirque_gen6_read_reg_16(CGEN6_VENDOR_ID);
-    uint16_t productId   = cirque_gen6_read_reg_16(CGEN6_PRODUCT_ID);
-    uint16_t versionId   = cirque_gen6_read_reg_16(CGEN6_FIRMWARE_REV);
-    uint32_t firmwareRev = cirque_gen6_read_reg_32(CGEN6_FIRMWARE_REV);
-
-    printf("Touchpad Hardware ID: 0x%02X\n", hardwareId);
-    printf("Touchpad Firmware ID: 0x%02X\n", firmwareId);
-    printf("Touchpad Vendor ID: 0x%04X\n", vendorId);
-    printf("Touchpad Product ID: 0x%04X\n", productId);
-    printf("Touchpad Version ID: 0x%04X\n", versionId);
-
-    uint32_t revision           = firmwareRev & 0x00ffffff;
-    bool     uncommittedVersion = firmwareRev & 0x80000000;
-    bool     branchVersion      = firmwareRev & 0x40000000;
-    uint8_t  developerId        = firmwareRev & 0x3f000000;
-
-    printf("Touchpad Firmware Revision: 0x%08X\n", (u_int)revision);
-    printf("Touchpad Uncommitted Version: %s\n", uncommittedVersion ? "true" : "false");
-    printf("Touchpad Branch Version: %s\n", branchVersion ? "true" : "false");
-    printf("Touchpad Developer ID: %d\n", developerId);
-
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     uint8_t res = cirque_gen6_set_ptp_mode();
 #endif
@@ -418,16 +395,18 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         int16_t abs_vy = scroll_inertia.vy < 0 ? -scroll_inertia.vy : scroll_inertia.vy;
         if (abs_vx < 64 && abs_vy < 64) {  // Threshold in Q8 (0.25 in real units)
             scroll_inertia.active = false;
-#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-            printf("INERTIA STOP\n");
-#        endif
         } else {
-#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-            printf("INERTIA: vx=%d vy=%d -> h=%d v=%d\n",
-                   scroll_inertia.vx, scroll_inertia.vy, -scroll_x, scroll_y);
-#        endif
-            mouse_report.h = -scroll_x;  // Invert for natural scrolling
+            // Apply scroll inversion if configured
+#    ifdef NAVIGATOR_SCROLL_INVERT_X
+            mouse_report.h = -scroll_x;
+#    else
+            mouse_report.h = scroll_x;
+#    endif
+#    ifdef NAVIGATOR_SCROLL_INVERT_Y
             mouse_report.v = scroll_y;
+#    else
+            mouse_report.v = -scroll_y;
+#    endif
             return mouse_report;
         }
     }
@@ -481,11 +460,6 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             dist_sq    = (int32_t)dx * dx + (int32_t)dy * dy;
         }
 
-#    ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-        printf("LIFT: state=%d, fingers=%d, dist_sq=%ld, duration=%dms, settled=%d\n",
-               gesture.state, gesture.max_finger_count, (long)dist_sq, duration, gesture.settled);
-#    endif
-
         // Check tap conditions: short duration AND small movement from settled position
         bool is_tap = (duration <= NAVIGATOR_TRACKPAD_TAP_TIMEOUT) &&
                       (dist_sq <= NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
@@ -493,9 +467,6 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         if (is_tap) {
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_DOUBLE_TAP
             if (gesture.max_finger_count >= 2) {
-#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-                printf("  -> RIGHT CLICK\n");
-#        endif
                 mouse_report.x        = 0;
                 mouse_report.y        = 0;
                 mouse_report.buttons  = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON2);
@@ -504,9 +475,6 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #    endif
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_TAP
             if (gesture.max_finger_count == 1) {
-#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-                printf("  -> LEFT CLICK\n");
-#        endif
                 mouse_report.x        = 0;
                 mouse_report.y        = 0;
                 mouse_report.buttons  = pointing_device_handle_buttons(mouse_report.buttons, true, POINTING_DEVICE_BUTTON1);
@@ -514,15 +482,8 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             }
 #    endif
         }
-#    ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-        else {
-            printf("  -> NO TAP (duration=%d/%d, dist=%ld/%d)\n",
-                   duration, NAVIGATOR_TRACKPAD_TAP_TIMEOUT,
-                   (long)dist_sq, NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
-        }
-#    endif
 
-#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+#    if defined(NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE) && defined(NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS)
         // Start scroll inertia if we were scrolling and have enough velocity
         if (gesture.state == TP_SCROLLING) {
             // Use smoothed velocity (already in Q8 format)
@@ -535,9 +496,6 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                 scroll_inertia.vy     = scroll_inertia.smooth_vy;
                 scroll_inertia.timer  = timer_read();
                 scroll_inertia.active = true;
-#        ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-                printf("INERTIA START: vx=%d vy=%d\n", scroll_inertia.vx, scroll_inertia.vy);
-#        endif
             }
         }
 #    endif
@@ -553,10 +511,12 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             gesture.max_finger_count = fingers;
         }
 
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
         // Determine mode based on finger count
         if (fingers >= 2 && gesture.state != TP_SCROLLING) {
             gesture.state = TP_SCROLLING;
         }
+#    endif
 
         uint16_t duration = timer_elapsed(gesture.touch_start_time);
 
@@ -584,6 +544,7 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             int16_t delta_y = ptp_report.fingers[0].y - gesture.prev_y;
 
             if (delta_x != 0 || delta_y != 0) {
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
                 if (gesture.state == TP_SCROLLING) {
                     // Two-finger scroll: output directly to h/v for high-res scrolling
                     // With high-res scrolling enabled, the OS divides by 120 to get ticks
@@ -623,18 +584,22 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                     scroll_x = (scroll_x > 127) ? 127 : ((scroll_x < -127) ? -127 : scroll_x);
                     scroll_y = (scroll_y > 127) ? 127 : ((scroll_y < -127) ? -127 : scroll_y);
 
-#    ifdef NAVIGATOR_TRACKPAD_GESTURE_DEBUG
-                    if (scroll_x != 0 || scroll_y != 0) {
-                        printf("SCROLL: delta=%d,%d *%d -> h=%d v=%d\n",
-                               delta_x, delta_y, NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER, -scroll_x, scroll_y);
-                    }
+                    // Apply scroll inversion if configured
+#    ifdef NAVIGATOR_SCROLL_INVERT_X
+                    mouse_report.h = -scroll_x;
+#    else
+                    mouse_report.h = scroll_x;
 #    endif
-
-                    mouse_report.h = -scroll_x;  // Invert for natural scrolling
+#    ifdef NAVIGATOR_SCROLL_INVERT_Y
                     mouse_report.v = scroll_y;
+#    else
+                    mouse_report.v = -scroll_y;
+#    endif
                     mouse_report.x = 0;
                     mouse_report.y = 0;
-                } else {
+                } else
+#    endif
+                {
                     // One-finger movement: mouse cursor
                     mouse_report.x = (delta_x < 0) ? -powf(-delta_x, 1.2) : powf(delta_x, 1.2);
                     mouse_report.y = (delta_y < 0) ? -powf(-delta_y, 1.2) : powf(delta_y, 1.2);

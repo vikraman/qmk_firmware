@@ -290,8 +290,8 @@ static bool usb_requests_hook_cb(USBDriver *usbp) {
                             case SHARED_INTERFACE:
 #endif
                             {
-                                uint8_t report_type = setup->wValue.hbyte;
 #if defined(POINTING_DEVICE_HIRES_SCROLL_ENABLE)
+                                uint8_t report_type = setup->wValue.hbyte;
                                 // Feature report (type 3) is used for Resolution Multiplier
                                 if (report_type == 3) {
                                     // Accept SET_REPORT for Resolution Multiplier feature report

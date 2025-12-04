@@ -26,7 +26,7 @@
 #        define CIRQUE_PINNACLE_Y_RANGE (CIRQUE_PINNACLE_Y_UPPER - CIRQUE_PINNACLE_Y_LOWER)
 #    endif
 
-#define NAVIGATOR_TRACKPAD_READ 10
+#define NAVIGATOR_TRACKPAD_READ 7
 #define NAVIGATOR_TRACKPAD_PROBE 1000
 
 #ifndef NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD
@@ -126,10 +126,10 @@ Configurable values (all optional):
 #define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_FRICTION 5  // Higher = stops faster (1-255)
 #endif
 #ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL
-#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL 5  // Glide report interval in ms
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL 7  // Glide report interval in ms
 #endif
 #ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER
-#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 0    // Min velocity to trigger glide
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 1    // Min velocity to trigger glide
 #endif
 
 typedef struct {

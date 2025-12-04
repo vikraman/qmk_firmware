@@ -131,7 +131,7 @@ Configurable values (all optional):
 #define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_INTERVAL 5  // Glide report interval in ms
 #endif
 #ifndef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER
-#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 1    // Min velocity to trigger glide
+#define NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER 0    // Min velocity to trigger glide
 #endif
 
 typedef struct {

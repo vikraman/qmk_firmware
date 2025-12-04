@@ -519,15 +519,27 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         if (fingers >= 2 && gesture.state != TP_SCROLLING) {
             gesture.state = TP_SCROLLING;
         } else if (fingers < 2 && gesture.state == TP_SCROLLING) {
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+            // Check if we should trigger inertia before transitioning
+            // This handles the case where fingers lift quickly (2->1->0)
+            int16_t abs_vx = scroll_inertia.smooth_vx < 0 ? -scroll_inertia.smooth_vx : scroll_inertia.smooth_vx;
+            int16_t abs_vy = scroll_inertia.smooth_vy < 0 ? -scroll_inertia.smooth_vy : scroll_inertia.smooth_vy;
+            if (abs_vx >= (NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER * 256) ||
+                abs_vy >= (NAVIGATOR_TRACKPAD_SCROLL_INERTIA_TRIGGER * 256)) {
+                // Store inertia values before transitioning
+                scroll_inertia.vx     = scroll_inertia.smooth_vx;
+                scroll_inertia.vy     = scroll_inertia.smooth_vy;
+                scroll_inertia.timer  = timer_read();
+                scroll_inertia.active = true;
+            } else {
+                scroll_inertia.active = false;
+            }
+#    endif
             // Transition from scrolling back to moving when finger is lifted
             gesture.state = TP_MOVING;
             // Reset position tracking to prevent jump from stale scroll position
             gesture.prev_x = local_report.fingers[0].x;
             gesture.prev_y = local_report.fingers[0].y;
-#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
-            // Stop scroll inertia when transitioning to cursor mode
-            scroll_inertia.active = false;
-#    endif
         }
 #    endif
 

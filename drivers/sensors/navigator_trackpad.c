@@ -518,6 +518,13 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         // Determine mode based on finger count
         if (fingers >= 2 && gesture.state != TP_SCROLLING) {
             gesture.state = TP_SCROLLING;
+        } else if (fingers < 2 && gesture.state == TP_SCROLLING) {
+            // Transition from scrolling back to moving when finger is lifted
+            gesture.state = TP_MOVING;
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
+            // Stop scroll inertia when transitioning to cursor mode
+            scroll_inertia.active = false;
+#    endif
         }
 #    endif
 

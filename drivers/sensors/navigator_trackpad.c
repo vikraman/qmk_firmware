@@ -429,9 +429,10 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
     // Create local snapshot to avoid race condition with callback updating ptp_report
     cgen6_report_t local_report = ptp_report;
 
-    uint8_t fingers     = finger_count(&local_report);
+    uint8_t raw_fingers = finger_count(&local_report);
     bool    is_touching = local_report.fingers[0].tip;
     bool    was_idle    = (gesture.state == TP_IDLE);
+    uint8_t fingers     = raw_fingers;
 
     // Handle finger down - record start position (regardless of current state)
     if (is_touching && was_idle) {
@@ -453,6 +454,10 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 
     // Handle finger up - evaluate tap at lift time (libinput style)
     if (!is_touching && !was_idle) {
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+        printf("GESTURE END: state=%d, max_fingers=%d, duration=%dms\n",
+               gesture.state, gesture.max_finger_count, timer_elapsed(gesture.touch_start_time));
+#    endif
         uint16_t duration = timer_elapsed(gesture.touch_start_time);
 
         // Calculate distance from settled position (or treat as no movement if never settled)
@@ -467,7 +472,30 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         bool is_tap = (duration <= NAVIGATOR_TRACKPAD_TAP_TIMEOUT) &&
                       (dist_sq <= NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
 
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
         if (is_tap) {
+            printf("TAP DETECTED: duration=%d, dist_sq=%ld, max_fingers=%d\n",
+                   duration, (long)dist_sq, gesture.max_finger_count);
+        }
+#    endif
+
+        // Don't trigger taps if we were scrolling (two fingers detected)
+        // Also suppress taps that happen shortly after a scroll ends (within 100ms)
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
+        if (is_tap && (gesture.max_finger_count >= 2 ||
+                       timer_elapsed(gesture.last_scroll_end) < 100)) {
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+            printf("TAP SUPPRESSED: was scrolling (max_fingers=%d, time_since_scroll=%d)\n",
+                   gesture.max_finger_count, timer_elapsed(gesture.last_scroll_end));
+#    endif
+            is_tap = false;  // Suppress tap after scrolling
+        }
+#    endif
+
+        if (is_tap) {
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+            printf("TAP TRIGGERED: max_fingers=%d\n", gesture.max_finger_count);
+#    endif
 #    ifdef NAVIGATOR_TRACKPAD_ENABLE_DOUBLE_TAP
             if (gesture.max_finger_count >= 2) {
                 mouse_report.x        = 0;
@@ -503,6 +531,13 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         }
 #    endif
 
+        // Record if this was a scroll gesture ending
+#    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
+        if (gesture.state == TP_SCROLLING || gesture.max_finger_count >= 2) {
+            gesture.last_scroll_end = timer_read();
+        }
+#    endif
+
         gesture.state = TP_IDLE;
         set_scrolling = false;
     }
@@ -517,8 +552,22 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
         // Determine mode based on finger count
         if (fingers >= 2 && gesture.state != TP_SCROLLING) {
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+            printf("SCROLL START: fingers=%d, f0=(%d,%d), f1=(%d,%d), prev=(%d,%d)\n",
+                   fingers, local_report.fingers[0].x, local_report.fingers[0].y,
+                   local_report.fingers[1].x, local_report.fingers[1].y,
+                   gesture.prev_x, gesture.prev_y);
+#    endif
             gesture.state = TP_SCROLLING;
+            // Reset position tracking - use finger[0] initially
+            gesture.prev_x = local_report.fingers[0].x;
+            gesture.prev_y = local_report.fingers[0].y;
         } else if (fingers < 2 && gesture.state == TP_SCROLLING) {
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+            printf("SCROLL->MOVE: fingers=%d, f0=(%d,%d), prev=(%d,%d)\n",
+                   fingers, local_report.fingers[0].x, local_report.fingers[0].y,
+                   gesture.prev_x, gesture.prev_y);
+#    endif
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
             // Check if we should trigger inertia before transitioning
             // This handles the case where fingers lift quickly (2->1->0)
@@ -537,7 +586,7 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #    endif
             // Transition from scrolling back to moving when finger is lifted
             gesture.state = TP_MOVING;
-            // Reset position tracking to prevent jump from stale scroll position
+            // Reset position tracking - use current position of remaining finger
             gesture.prev_x = local_report.fingers[0].x;
             gesture.prev_y = local_report.fingers[0].y;
         }
@@ -567,6 +616,15 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         if (should_move) {
             int16_t delta_x = local_report.fingers[0].x - gesture.prev_x;
             int16_t delta_y = local_report.fingers[0].y - gesture.prev_y;
+
+#    ifdef NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+            if ((delta_x != 0 || delta_y != 0)) {
+                printf("%s: fingers=%d, f0=(%d,%d), prev=(%d,%d), delta=(%d,%d)\n",
+                       gesture.state == TP_SCROLLING ? "SCROLL MOVE" : "CURSOR MOVE",
+                       fingers, local_report.fingers[0].x, local_report.fingers[0].y,
+                       gesture.prev_x, gesture.prev_y, delta_x, delta_y);
+            }
+#    endif
 
             // Clamp deltas to prevent jumps from bad data
             if (delta_x > NAVIGATOR_TRACKPAD_MAX_DELTA) delta_x = NAVIGATOR_TRACKPAD_MAX_DELTA;
@@ -638,6 +696,7 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             }
         }
 
+        // Update prev position for next frame
         gesture.prev_x = local_report.fingers[0].x;
         gesture.prev_y = local_report.fingers[0].y;
     }

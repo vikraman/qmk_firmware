@@ -108,6 +108,9 @@
 // Two-finger scrolling (define to enable)
 // #define NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
 
+// Debug logging for scroll issues (define to enable)
+// #define NAVIGATOR_TRACKPAD_DEBUG_SCROLL
+
 // Scroll inversion configuration
 // Define these to invert scroll direction on respective axes
 // #define NAVIGATOR_SCROLL_INVERT_X
@@ -180,6 +183,7 @@ typedef struct {
     uint8_t          max_finger_count;  // Max fingers seen during this gesture
     bool             settled;           // Has the settle time elapsed?
     bool             pending_click;     // Need to send a click release next cycle
+    uint16_t         last_scroll_end;   // Time when last scroll gesture ended
 } trackpad_gesture_t;
 #endif
 

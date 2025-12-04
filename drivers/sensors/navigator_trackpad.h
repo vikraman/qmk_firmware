@@ -28,8 +28,6 @@
 
 #define NAVIGATOR_TRACKPAD_READ 10
 #define NAVIGATOR_TRACKPAD_PROBE 1000
-#define NAVIGATOR_TRACKPAD_TAPPING_TERM 100
-#define NAVIGATOR_TRACKPAD_TAP_DEBOUNCE 100
 
 #ifndef NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD
 #    define NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD 100  // Max movement (squared) before tap becomes a drag
@@ -107,9 +105,6 @@
 
 // Two-finger scrolling (define to enable)
 // #define NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
-
-// Debug logging for scroll issues (define to enable)
-// #define NAVIGATOR_TRACKPAD_DEBUG_SCROLL
 
 // Scroll inversion configuration
 // Define these to invert scroll direction on respective axes

@@ -43,6 +43,10 @@
 #    define NAVIGATOR_TRACKPAD_TAP_SETTLE_TIME 30  // Ignore movement during initial contact (ms)
 #endif
 
+#ifndef NAVIGATOR_TRACKPAD_MAX_DELTA
+#    define NAVIGATOR_TRACKPAD_MAX_DELTA 250  // Max allowed delta per frame to prevent jumps
+#endif
+
 #ifndef NAVIGATOR_TRACKPAD_ADDRESS
 #    define NAVIGATOR_TRACKPAD_ADDRESS 0x58
 #endif

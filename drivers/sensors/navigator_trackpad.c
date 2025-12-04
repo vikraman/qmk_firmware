@@ -426,15 +426,18 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #endif
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-    uint8_t fingers     = finger_count(&ptp_report);
-    bool    is_touching = ptp_report.fingers[0].tip;
+    // Create local snapshot to avoid race condition with callback updating ptp_report
+    cgen6_report_t local_report = ptp_report;
+
+    uint8_t fingers     = finger_count(&local_report);
+    bool    is_touching = local_report.fingers[0].tip;
     bool    was_idle    = (gesture.state == TP_IDLE);
 
     // Handle finger down - record start position (regardless of current state)
     if (is_touching && was_idle) {
         gesture.touch_start_time = timer_read();
-        gesture.prev_x           = ptp_report.fingers[0].x;
-        gesture.prev_y           = ptp_report.fingers[0].y;
+        gesture.prev_x           = local_report.fingers[0].x;
+        gesture.prev_y           = local_report.fingers[0].y;
         gesture.settled_x        = 0;  // Will be set after settle time
         gesture.settled_y        = 0;
         gesture.settled          = false;
@@ -523,15 +526,15 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         // Record settled position once settle time elapses
         if (!gesture.settled && duration >= NAVIGATOR_TRACKPAD_TAP_SETTLE_TIME) {
             gesture.settled   = true;
-            gesture.settled_x = ptp_report.fingers[0].x;
-            gesture.settled_y = ptp_report.fingers[0].y;
+            gesture.settled_x = local_report.fingers[0].x;
+            gesture.settled_y = local_report.fingers[0].y;
         }
 
         // Check if we should suppress movement (might still be a tap)
         int32_t dist_sq = 0;
         if (gesture.settled) {
-            int16_t dx = ptp_report.fingers[0].x - gesture.settled_x;
-            int16_t dy = ptp_report.fingers[0].y - gesture.settled_y;
+            int16_t dx = local_report.fingers[0].x - gesture.settled_x;
+            int16_t dy = local_report.fingers[0].y - gesture.settled_y;
             dist_sq    = (int32_t)dx * dx + (int32_t)dy * dy;
         }
 
@@ -540,8 +543,14 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                            (gesture.settled && dist_sq > NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
 
         if (should_move) {
-            int16_t delta_x = ptp_report.fingers[0].x - gesture.prev_x;
-            int16_t delta_y = ptp_report.fingers[0].y - gesture.prev_y;
+            int16_t delta_x = local_report.fingers[0].x - gesture.prev_x;
+            int16_t delta_y = local_report.fingers[0].y - gesture.prev_y;
+
+            // Clamp deltas to prevent jumps from bad data
+            if (delta_x > NAVIGATOR_TRACKPAD_MAX_DELTA) delta_x = NAVIGATOR_TRACKPAD_MAX_DELTA;
+            if (delta_x < -NAVIGATOR_TRACKPAD_MAX_DELTA) delta_x = -NAVIGATOR_TRACKPAD_MAX_DELTA;
+            if (delta_y > NAVIGATOR_TRACKPAD_MAX_DELTA) delta_y = NAVIGATOR_TRACKPAD_MAX_DELTA;
+            if (delta_y < -NAVIGATOR_TRACKPAD_MAX_DELTA) delta_y = -NAVIGATOR_TRACKPAD_MAX_DELTA;
 
             if (delta_x != 0 || delta_y != 0) {
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
@@ -607,8 +616,8 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             }
         }
 
-        gesture.prev_x = ptp_report.fingers[0].x;
-        gesture.prev_y = ptp_report.fingers[0].y;
+        gesture.prev_x = local_report.fingers[0].x;
+        gesture.prev_y = local_report.fingers[0].y;
     }
 #endif
 

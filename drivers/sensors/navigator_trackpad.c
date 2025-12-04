@@ -21,7 +21,6 @@ const pointing_device_driver_t navigator_trackpad_pointing_device_driver = {.ini
 
 deferred_token callback_token = 0;
 uint16_t    current_cpi = DEFAULT_CPI_TICK;
-uint32_t    gpio_offset_addr;
 uint8_t     has_motion = 0;
 extern bool set_scrolling;
 bool        trackpad_init;
@@ -234,14 +233,9 @@ uint8_t cirque_gen6_enable_logical_scaling(bool set) {
     if (set) {
         xy_config &= ~0x08;
     } else {
-        xy_config |= ~0x08;
+        xy_config |= 0x08;
     }
     return cirque_gen6_write_reg(CGEN6_XY_CONFIG, xy_config);
-}
-
-bool cirque_gen6_get_gpio_state(uint8_t num) {
-    uint32_t gpio_states = cirque_gen6_read_reg_32(0x43000000 + gpio_offset_addr + 0x0004);
-    return ((gpio_states >> num) & 0x000000001);
 }
 
 void cirque_gen_6_read_report(void) {
@@ -253,19 +247,13 @@ void cirque_gen_6_read_report(void) {
     uint8_t report_id = packet[2];
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     if (report_id == CGEN6_PTP_REPORT_ID) {
-        ptp_report.fingers[0].id            = (packet[3] & 0xFC) >> 2;
-        ptp_report.fingers[0].confidence    = packet[3] & 0x01;
-        ptp_report.fingers[0].tip           = (packet[3] & 0x02) >> 1;
-        ptp_report.fingers[0].x  = packet[5] << 8 | packet[4];
-        ptp_report.fingers[0].y  = packet[7] << 8 | packet[6];
-        ptp_report.fingers[1].id            = (packet[8] & 0xFC) >> 2;
-        ptp_report.fingers[1].confidence    = packet[8] & 0x01;
-        ptp_report.fingers[1].tip           = (packet[8] & 0x02) >> 1;
-        ptp_report.fingers[1].x  = packet[10] << 8 | packet[9];
-        ptp_report.fingers[1].y  = packet[12] << 8 | packet[11];
-        ptp_report.ts       = packet[14] << 8 | packet[13];
-        ptp_report.contact_count = packet[15];
-        ptp_report.buttons       = packet[16];
+        ptp_report.fingers[0].tip = (packet[3] & 0x02) >> 1;
+        ptp_report.fingers[0].x   = packet[5] << 8 | packet[4];
+        ptp_report.fingers[0].y   = packet[7] << 8 | packet[6];
+        ptp_report.fingers[1].tip = (packet[8] & 0x02) >> 1;
+        ptp_report.fingers[1].x   = packet[10] << 8 | packet[9];
+        ptp_report.fingers[1].y   = packet[12] << 8 | packet[11];
+        ptp_report.buttons        = packet[16];
     }
 #endif
 #if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
@@ -278,26 +266,6 @@ void cirque_gen_6_read_report(void) {
 
         has_motion = 1;
     }
-#endif
-}
-
-void dump_ptp_report(void) {
-#if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-    printf("PTP Report:\n");
-    printf(" ID finger 1: %d\n", ptp_report.fingers[0].id);
-    printf(" Confidence finger 1: %d\n", ptp_report.fingers[0].confidence);
-    printf(" Tip finger 1: %d\n", ptp_report.fingers[0].tip);
-    printf(" X finger 1: %d\n", ptp_report.fingers[0].x);
-    printf(" Y finger 1: %d\n", ptp_report.fingers[0].y);
-    printf(" ID finger 2: %d\n", ptp_report.fingers[1].id);
-    printf(" Confidence finger 2: %d\n", ptp_report.fingers[1].confidence);
-    printf(" Tip finger 2: %d\n", ptp_report.fingers[1].tip);
-    printf(" X finger 2: %d\n", ptp_report.fingers[1].x);
-    printf(" Y finger 2: %d\n", ptp_report.fingers[1].y);
-    printf(" Timestamp: %d\n", ptp_report.ts);
-    printf(" Contact Count: %d\n", ptp_report.contact_count);
-    printf(" Buttons: %d\n", ptp_report.buttons);
-    printf(" Fingers: %d\n", finger_count(&ptp_report));
 #endif
 }
 
@@ -327,11 +295,12 @@ void navigator_trackpad_device_init(void) {
     }
     cirque_gen6_clear();
     wait_ms(50);
+
+    uint8_t res = CGEN6_SUCCESS;
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-    uint8_t res = cirque_gen6_set_ptp_mode();
-#endif
-#if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
-    uint8_t res = cirque_gen6_set_relative_mode();
+    res = cirque_gen6_set_ptp_mode();
+#elif defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
+    res = cirque_gen6_set_relative_mode();
 #endif
 
     if (res != CGEN6_SUCCESS) {
@@ -468,12 +437,12 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         bool is_tap = (duration <= NAVIGATOR_TRACKPAD_TAP_TIMEOUT) &&
                       (dist_sq <= NAVIGATOR_TRACKPAD_TAP_MOVE_THRESHOLD);
 
-        // Don't trigger taps if we were scrolling (two fingers detected)
-        // Also suppress taps that happen shortly after a scroll ends (within 100ms)
+        // Don't trigger single-finger taps that happen shortly after a scroll ends (within 100ms)
+        // But allow two-finger taps (right-click) even after scrolling
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
-        if (is_tap && (gesture.max_finger_count >= 2 ||
-                       timer_elapsed(gesture.last_scroll_end) < 100)) {
-            is_tap = false;  // Suppress tap after scrolling
+        if (is_tap && gesture.max_finger_count == 1 &&
+            timer_elapsed(gesture.last_scroll_end) < 100) {
+            is_tap = false;  // Suppress single-finger tap after scrolling
         }
 #    endif
 

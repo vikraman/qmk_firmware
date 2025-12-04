@@ -7,25 +7,6 @@
 #include "report.h"
 #include "pointing_device.h"
 
-#    ifndef CIRQUE_PINNACLE_X_LOWER
-#        define CIRQUE_PINNACLE_X_LOWER 127 // min "reachable" X value
-#    endif
-#    ifndef CIRQUE_PINNACLE_X_UPPER
-#        define CIRQUE_PINNACLE_X_UPPER 1919 // max "reachable" X value
-#    endif
-#    ifndef CIRQUE_PINNACLE_Y_LOWER
-#        define CIRQUE_PINNACLE_Y_LOWER 63 // min "reachable" Y value
-#    endif
-#    ifndef CIRQUE_PINNACLE_Y_UPPER
-#        define CIRQUE_PINNACLE_Y_UPPER 1471 // max "reachable" Y value
-#    endif
-#    ifndef CIRQUE_PINNACLE_X_RANGE
-#        define CIRQUE_PINNACLE_X_RANGE (CIRQUE_PINNACLE_X_UPPER - CIRQUE_PINNACLE_X_LOWER)
-#    endif
-#    ifndef CIRQUE_PINNACLE_Y_RANGE
-#        define CIRQUE_PINNACLE_Y_RANGE (CIRQUE_PINNACLE_Y_UPPER - CIRQUE_PINNACLE_Y_LOWER)
-#    endif
-
 #define NAVIGATOR_TRACKPAD_READ 7
 #define NAVIGATOR_TRACKPAD_PROBE 1000
 
@@ -147,8 +128,6 @@ typedef struct {
 #        define MOUSE_EXTENDED_REPORT
 #    endif
 typedef struct {
-    uint8_t  id;
-    uint8_t  confidence;
     uint8_t  tip;
     uint16_t x;
     uint16_t y;
@@ -156,8 +135,6 @@ typedef struct {
 
 typedef struct {
     cgen6_finger_t fingers[2];
-    uint16_t ts;
-    uint8_t  contact_count;
     uint8_t  buttons;
 } cgen6_report_t;
 

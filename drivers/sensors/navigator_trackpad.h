@@ -134,6 +134,9 @@ typedef struct {
     int16_t  smooth_vy;    // Smoothed Y velocity (Q8 fixed point)
     uint16_t timer;        // Timer for interval tracking
     bool     active;       // Is glide currently active
+#ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+    uint8_t  no_output_count; // Counter for consecutive frames with no output
+#endif
 } scroll_inertia_t;
 #endif
 

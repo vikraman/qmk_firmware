@@ -391,9 +391,26 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         // Check if velocity is too low to continue
         int16_t abs_vx = scroll_inertia.vx < 0 ? -scroll_inertia.vx : scroll_inertia.vx;
         int16_t abs_vy = scroll_inertia.vy < 0 ? -scroll_inertia.vy : scroll_inertia.vy;
+
+#    ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+        // In macOS mode, track consecutive frames with no output to detect janky tail
+        if (scroll_x == 0 && scroll_y == 0) {
+            scroll_inertia.no_output_count++;
+        } else {
+            scroll_inertia.no_output_count = 0;
+        }
+
+        // Stop if: velocity very low OR too many consecutive frames without output
+        bool velocity_too_low = (abs_vx < 64 && abs_vy < 64);  // Same as hi-res mode
+        bool stalled = (scroll_inertia.no_output_count > 5);    // 5 frames (~35ms) with no output
+        if (velocity_too_low || stalled) {
+            scroll_inertia.active = false;
+        } else {
+#    else
         if (abs_vx < 64 && abs_vy < 64) {  // Threshold in Q8 (0.25 in real units)
             scroll_inertia.active = false;
         } else {
+#    endif
             // Apply scroll inversion if configured
 #    ifdef NAVIGATOR_SCROLL_INVERT_X
             mouse_report.h = -scroll_x;
@@ -407,6 +424,9 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #    endif
             return mouse_report;
         }
+#    ifndef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+        }
+#    endif
     }
 #    endif
 #endif
@@ -447,6 +467,9 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         scroll_inertia.active    = false;
         scroll_inertia.smooth_vx = 0;
         scroll_inertia.smooth_vy = 0;
+#        ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+        scroll_inertia.no_output_count = 0;
+#        endif
 #    endif
 #    ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
         // Reset macOS scroll accumulator when starting new gesture

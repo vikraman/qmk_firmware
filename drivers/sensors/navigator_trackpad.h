@@ -87,6 +87,20 @@
 // Two-finger scrolling (define to enable)
 // #define NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
 
+// macOS scrolling mode (define to enable)
+// macOS doesn't respect the HID Resolution Multiplier descriptor and expects
+// small 1/-1 scroll reports instead. Enable this for macOS compatibility.
+// When enabled, scroll values are normalized to 1/-1 with accumulation for smooth control.
+// When disabled (default), uses hi-res scrolling with POINTING_DEVICE_HIRES_SCROLL_ENABLE
+// #define NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+
+// macOS scroll speed divider (higher = slower, default: 60)
+// Only used when NAVIGATOR_TRACKPAD_MACOS_SCROLLING is enabled
+// Adjust this value to control scroll speed on macOS
+#ifndef NAVIGATOR_TRACKPAD_MACOS_SCROLL_DIVIDER
+#    define NAVIGATOR_TRACKPAD_MACOS_SCROLL_DIVIDER 60
+#endif
+
 // Scroll inversion configuration
 // Define these to invert scroll direction on respective axes
 // #define NAVIGATOR_SCROLL_INVERT_X

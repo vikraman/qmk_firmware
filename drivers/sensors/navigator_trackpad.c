@@ -357,36 +357,19 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         scroll_inertia.vy -= friction_y;
 
         // Convert Q8 velocity to scroll value
+#    ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+        // macOS mode: send raw velocity deltas (descriptor tells macOS the resolution)
+        int16_t scroll_x = scroll_inertia.vx / 256;
+        int16_t scroll_y = scroll_inertia.vy / 256;
+#    else
+        // Hi-res mode: apply multiplier for Windows/Linux
         int16_t scroll_x = (scroll_inertia.vx * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER) / 256;
         int16_t scroll_y = (scroll_inertia.vy * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER) / 256;
+#    endif
 
-#    ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
-        // macOS mode: accumulate scroll and only output when threshold is crossed
-        macos_scroll_accumulated_h += (float)scroll_x / NAVIGATOR_TRACKPAD_MACOS_SCROLL_DIVIDER;
-        macos_scroll_accumulated_v += (float)scroll_y / NAVIGATOR_TRACKPAD_MACOS_SCROLL_DIVIDER;
-
-        float abs_h = (macos_scroll_accumulated_h < 0) ? -macos_scroll_accumulated_h : macos_scroll_accumulated_h;
-        float abs_v = (macos_scroll_accumulated_v < 0) ? -macos_scroll_accumulated_v : macos_scroll_accumulated_v;
-
-        // Only output scroll when accumulated value crosses 1.0
-        if (abs_h >= 1.0f) {
-            scroll_x = (macos_scroll_accumulated_h > 0) ? 1 : -1;
-            macos_scroll_accumulated_h -= (macos_scroll_accumulated_h > 0) ? 1.0f : -1.0f;
-        } else {
-            scroll_x = 0;
-        }
-
-        if (abs_v >= 1.0f) {
-            scroll_y = (macos_scroll_accumulated_v > 0) ? 1 : -1;
-            macos_scroll_accumulated_v -= (macos_scroll_accumulated_v > 0) ? 1.0f : -1.0f;
-        } else {
-            scroll_y = 0;
-        }
-#    else
-        // Hi-res mode: clamp to int8_t range
+        // Clamp to int8_t range
         scroll_x = (scroll_x > 127) ? 127 : ((scroll_x < -127) ? -127 : scroll_x);
         scroll_y = (scroll_y > 127) ? 127 : ((scroll_y < -127) ? -127 : scroll_y);
-#    endif
 
         // Check if velocity is too low to continue
         int16_t abs_vx = scroll_inertia.vx < 0 ? -scroll_inertia.vx : scroll_inertia.vx;
@@ -604,11 +587,17 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
             if (delta_x != 0 || delta_y != 0) {
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_WITH_TWO_FINGERS
                 if (gesture.state == TP_SCROLLING) {
-                    // Two-finger scroll: output directly to h/v for high-res scrolling
-                    // With high-res scrolling enabled, the OS divides by 120 to get ticks
-                    // Apply multiplier to adjust scroll speed
+#    ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
+                    // macOS mode: send raw deltas, macOS handles scaling via HIDScrollResolution
+                    // Apple trackpads report raw sensor deltas and let macOS apply acceleration
+                    int16_t scroll_x = delta_x;
+                    int16_t scroll_y = delta_y;
+#    else
+                    // Hi-res mode: apply multiplier for Windows/Linux
+                    // These OSes divide by the Resolution Multiplier (120)
                     int16_t scroll_x = delta_x * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
                     int16_t scroll_y = delta_y * NAVIGATOR_TRACKPAD_SCROLL_MULTIPLIER;
+#    endif
 
 #    ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
                     // Track velocity for inertia using exponential smoothing (Q8 fixed point)
@@ -638,34 +627,9 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
                     }
 #    endif
 
-#    ifdef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
-                    // macOS mode: accumulate scroll and only output when threshold is crossed
-                    // This provides fine-grained speed control via the divider
-                    macos_scroll_accumulated_h += (float)scroll_x / NAVIGATOR_TRACKPAD_MACOS_SCROLL_DIVIDER;
-                    macos_scroll_accumulated_v += (float)scroll_y / NAVIGATOR_TRACKPAD_MACOS_SCROLL_DIVIDER;
-
-                    float abs_h = (macos_scroll_accumulated_h < 0) ? -macos_scroll_accumulated_h : macos_scroll_accumulated_h;
-                    float abs_v = (macos_scroll_accumulated_v < 0) ? -macos_scroll_accumulated_v : macos_scroll_accumulated_v;
-
-                    // Only output scroll when accumulated value crosses 1.0
-                    if (abs_h >= 1.0f) {
-                        scroll_x = (macos_scroll_accumulated_h > 0) ? 1 : -1;
-                        macos_scroll_accumulated_h -= (macos_scroll_accumulated_h > 0) ? 1.0f : -1.0f;
-                    } else {
-                        scroll_x = 0;
-                    }
-
-                    if (abs_v >= 1.0f) {
-                        scroll_y = (macos_scroll_accumulated_v > 0) ? 1 : -1;
-                        macos_scroll_accumulated_v -= (macos_scroll_accumulated_v > 0) ? 1.0f : -1.0f;
-                    } else {
-                        scroll_y = 0;
-                    }
-#    else
-                    // Hi-res mode: clamp to int8_t range for the report
+                    // Clamp to int8_t range for the report
                     scroll_x = (scroll_x > 127) ? 127 : ((scroll_x < -127) ? -127 : scroll_x);
                     scroll_y = (scroll_y > 127) ? 127 : ((scroll_y < -127) ? -127 : scroll_y);
-#    endif
 
                     // Apply scroll inversion if configured
 #    ifdef NAVIGATOR_SCROLL_INVERT_X

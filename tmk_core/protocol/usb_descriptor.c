@@ -196,6 +196,20 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
             HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_REPORT_SIZE(8, 0x10),
 #    endif
+#    ifdef POINTING_DEVICE_MACOS_SCROLL_RESOLUTION
+            // Add physical units for macOS scrolling
+            HID_RI_UNIT(8, 0x13),           // English Linear (inches)
+            HID_RI_UNIT_EXPONENT(8, -4),    // 10^-4 scale
+#        ifndef WHEEL_EXTENDED_REPORT
+            // Calculate: (127 / UNITS_PER_INCH) * 10000 for 10^-4 scale
+            HID_RI_PHYSICAL_MINIMUM(16, -(1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+            HID_RI_PHYSICAL_MAXIMUM(16,   (1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+#        else
+            // Calculate: (32767 / UNITS_PER_INCH) * 10000 for 10^-4 scale
+            HID_RI_PHYSICAL_MINIMUM(16, -(327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+            HID_RI_PHYSICAL_MAXIMUM(16,   (327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+#        endif
+#    endif
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_RELATIVE),
 
             // Horizontal wheel (1 or 2 bytes)
@@ -211,6 +225,20 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
             HID_RI_LOGICAL_MAXIMUM(16,  32767),
             HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_REPORT_SIZE(8, 0x10),
+#    endif
+#    ifdef POINTING_DEVICE_MACOS_SCROLL_RESOLUTION
+            // Add physical units for macOS scrolling
+            HID_RI_UNIT(8, 0x13),           // English Linear (inches)
+            HID_RI_UNIT_EXPONENT(8, -4),    // 10^-4 scale
+#        ifndef WHEEL_EXTENDED_REPORT
+            // Calculate: (127 / UNITS_PER_INCH) * 10000 for 10^-4 scale
+            HID_RI_PHYSICAL_MINIMUM(16, -(1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+            HID_RI_PHYSICAL_MAXIMUM(16,   (1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+#        else
+            // Calculate: (32767 / UNITS_PER_INCH) * 10000 for 10^-4 scale
+            HID_RI_PHYSICAL_MINIMUM(16, -(327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+            HID_RI_PHYSICAL_MAXIMUM(16,   (327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
+#        endif
 #    endif
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_RELATIVE),
 

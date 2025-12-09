@@ -84,6 +84,10 @@ ifeq ($(strip $(DIGITIZER_ENABLE)), yes)
     endif
 endif
 
+ifeq ($(strip $(PRECISION_TRACKPAD_ENABLE)), yes)
+    OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
+endif
+
 ifeq ($(strip $(SHARED_EP_ENABLE)), yes)
     OPT_DEFS += -DSHARED_EP_ENABLE
 endif

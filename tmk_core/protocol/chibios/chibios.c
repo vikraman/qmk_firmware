@@ -67,6 +67,9 @@ void send_nkro(report_nkro_t *report);
 void send_mouse(report_mouse_t *report);
 void send_extra(report_extra_t *report);
 void send_raw_hid(uint8_t *data, uint8_t length);
+#ifdef PRECISION_TRACKPAD_ENABLE
+void send_trackpad(report_trackpad_t *report);
+#endif
 
 /* host struct */
 host_driver_t chibios_driver = {

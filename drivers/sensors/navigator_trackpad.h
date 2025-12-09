@@ -5,7 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "report.h"
-#include "pointing_device.h"
+
+#ifdef POINTING_DEVICE_ENABLE
+#    include "pointing_device.h"
+#endif
 
 #define NAVIGATOR_TRACKPAD_READ 7
 #define NAVIGATOR_TRACKPAD_PROBE 1000
@@ -194,9 +197,16 @@ typedef struct {
 } cgen6_report_t;
 #endif
 
+#ifdef POINTING_DEVICE_ENABLE
 const pointing_device_driver_t navigator_trackpad_pointing_device_driver;
-void           navigator_trackpad_device_init(void);
 report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report);
+#endif
+
+void           navigator_trackpad_device_init(void);
 uint16_t       navigator_trackpad_get_cpi(void);
 void           navigator_trackpad_set_cpi(uint16_t cpi);
 void           restore_cpi(uint8_t cpi);
+
+#ifdef PRECISION_TRACKPAD_ENABLE
+void navigator_trackpad_task(void);
+#endif

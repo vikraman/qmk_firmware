@@ -84,6 +84,44 @@ bool usb_get_report_cb(USBDriver *driver) {
 
     static usb_fs_report_t report;
 
+#ifdef PRECISION_TRACKPAD_ENABLE
+    // Handle PTP feature report requests
+    if (interface == TRACKPAD_INTERFACE) {
+        static uint8_t feature_report[2];
+
+        switch (report_id) {
+            case REPORT_ID_TRACKPAD_MAX_COUNT:
+                // Report max contact count and pad type
+                feature_report[0] = REPORT_ID_TRACKPAD_MAX_COUNT;
+                feature_report[1] = (2 << 0) | (0 << 4);  // 2 contacts, clickpad (depressible)
+                usbSetupTransfer(driver, feature_report, 2, NULL);
+                return true;
+
+            case REPORT_ID_TRACKPAD_CONFIG:
+                // Report input mode (3 = multi-touch)
+                feature_report[0] = REPORT_ID_TRACKPAD_CONFIG;
+                feature_report[1] = 3;  // Multi-touch mode
+                usbSetupTransfer(driver, feature_report, 2, NULL);
+                return true;
+
+            case REPORT_ID_TRACKPAD_FEATURE:
+                // Surface and button switches (both enabled)
+                feature_report[0] = REPORT_ID_TRACKPAD_FEATURE;
+                feature_report[1] = 0;  // Both switches enabled (0 = enabled)
+                usbSetupTransfer(driver, feature_report, 2, NULL);
+                return true;
+
+            case REPORT_ID_TRACKPAD_PTPHQA:
+                // Certification blob - send empty 257-byte report
+                {
+                    static uint8_t cert_blob[257] = {REPORT_ID_TRACKPAD_PTPHQA};
+                    usbSetupTransfer(driver, cert_blob, sizeof(cert_blob), NULL);
+                }
+                return true;
+        }
+    }
+#endif
+
     if (!IS_VALID_INTERFACE(interface) || !IS_VALID_REPORT_ID(report_id)) {
         return false;
     }

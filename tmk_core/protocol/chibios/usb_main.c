@@ -313,6 +313,12 @@ static bool usb_requests_hook_cb(USBDriver *usbp) {
 #    endif
                                 break;
 #endif
+#ifdef PRECISION_TRACKPAD_ENABLE
+                            case TRACKPAD_INTERFACE:
+                                // Accept SET_REPORT for PTP - Windows may send configuration
+                                usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), NULL);
+                                return true;
+#endif
                         }
                         break;
                     case HID_REQ_SetProtocol:
@@ -522,6 +528,12 @@ void send_digitizer(report_digitizer_t *report) {
     send_report(USB_ENDPOINT_IN_DIGITIZER, report, sizeof(report_digitizer_t));
 #endif
 }
+
+#ifdef PRECISION_TRACKPAD_ENABLE
+void send_trackpad(report_trackpad_t *report) {
+    send_report(USB_ENDPOINT_IN_TRACKPAD, report, sizeof(report_trackpad_t));
+}
+#endif
 
 /* ---------------------------------------------------------
  *                   Console functions

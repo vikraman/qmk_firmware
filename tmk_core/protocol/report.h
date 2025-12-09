@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // clang-format off
 
 /* HID report IDs */
-enum hid_report_ids { 
+enum hid_report_ids {
     REPORT_ID_ALL = 0,
     REPORT_ID_KEYBOARD = 1,
     REPORT_ID_MOUSE,
@@ -39,7 +39,15 @@ enum hid_report_ids {
     REPORT_ID_NKRO,
     REPORT_ID_JOYSTICK,
     REPORT_ID_DIGITIZER,
-    REPORT_ID_COUNT = REPORT_ID_DIGITIZER
+
+    // PTP trackpad uses its own report ID sequence starting at 0x01
+    // to match Windows PTP HID specification
+    REPORT_ID_TRACKPAD = 0x01,
+    REPORT_ID_TRACKPAD_CONFIG = 0x0A,
+    REPORT_ID_TRACKPAD_FEATURE = 0x0B,
+    REPORT_ID_TRACKPAD_MAX_COUNT = 0x0C,
+    REPORT_ID_TRACKPAD_PTPHQA = 0x0D,
+    REPORT_ID_COUNT = REPORT_ID_TRACKPAD_PTPHQA
 };
 
 #define IS_VALID_REPORT_ID(id) ((id) >= REPORT_ID_ALL && (id) <= REPORT_ID_COUNT)
@@ -239,6 +247,60 @@ typedef struct {
     uint16_t x;
     uint16_t y;
 } PACKED report_digitizer_t;
+
+#ifdef PRECISION_TRACKPAD_ENABLE
+// Per-contact data structure for PTP
+typedef struct {
+    bool     confidence : 1;  // Confidence bit (1 = intentional touch, 0 = palm/accidental)
+    bool     tip : 1;          // Tip switch (contact state)
+    uint8_t  contact_id : 2;   // Contact identifier (0-based, supports up to 4 contacts)
+    uint8_t  reserved : 4;     // Reserved/padding bits
+    uint16_t x;                // Absolute X position
+    uint16_t y;                // Absolute Y position
+} PACKED report_trackpad_contact_t;
+
+// Main trackpad input report
+typedef struct {
+    uint8_t                     report_id;     // Report ID for trackpad
+    report_trackpad_contact_t   contacts[2];   // Up to 2 simultaneous contacts
+    uint16_t                    scan_time;     // Scan time in 100μs units
+    uint8_t                     contact_count; // Number of active contacts
+    uint8_t                     button1 : 1;   // Physical button 1
+    uint8_t                     button2 : 1;   // Physical button 2
+    uint8_t                     button3 : 1;   // Physical button 3
+    uint8_t                     button_pad : 5; // Padding for buttons
+} PACKED report_trackpad_t;
+
+// Compile-time assertion to verify structure size
+_Static_assert(sizeof(report_trackpad_t) == 15, "report_trackpad_t must be exactly 15 bytes");
+
+// Feature report for device capabilities
+typedef struct {
+    uint8_t report_id;           // REPORT_ID_TRACKPAD_MAX_COUNT
+    uint8_t max_contact_count : 4; // Maximum number of contacts (2)
+    uint8_t pad_type : 4;        // Pad type (0 = depressible click-pad, 1 = pressure pad)
+} PACKED report_trackpad_max_count_t;
+
+// Feature report for configuration
+typedef struct {
+    uint8_t report_id;    // REPORT_ID_TRACKPAD_CONFIG
+    uint8_t input_mode;   // Input mode (0 = mouse, 3 = multi-touch)
+} PACKED report_trackpad_config_t;
+
+// Feature report for function switches
+typedef struct {
+    uint8_t report_id;       // REPORT_ID_TRACKPAD_FEATURE
+    uint8_t surface_switch : 1; // Surface switch (0 = enabled, 1 = disabled)
+    uint8_t button_switch : 1;  // Button switch (0 = enabled, 1 = disabled)
+    uint8_t reserved : 6;
+} PACKED report_trackpad_feature_t;
+
+// Vendor-specific certification blob (256 bytes)
+typedef struct {
+    uint8_t report_id;    // REPORT_ID_TRACKPAD_PTPHQA
+    uint8_t blob[256];    // Certification status blob
+} PACKED report_trackpad_ptphqa_t;
+#endif
 
 #if JOYSTICK_AXIS_RESOLUTION > 8
 typedef int16_t joystick_axis_t;

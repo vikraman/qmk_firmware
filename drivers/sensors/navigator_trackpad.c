@@ -17,7 +17,9 @@
 # error "LUFA is not supported yet"
 #endif
 
+#ifdef POINTING_DEVICE_ENABLE
 const pointing_device_driver_t navigator_trackpad_pointing_device_driver = {.init = navigator_trackpad_device_init, .get_report = navigator_trackpad_get_report, .get_cpi = navigator_trackpad_get_cpi, .set_cpi = navigator_trackpad_set_cpi};
+#endif
 
 deferred_token callback_token = 0;
 uint16_t    current_cpi = DEFAULT_CPI_TICK;
@@ -42,10 +44,10 @@ scroll_inertia_t    scroll_inertia = {0};
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 uint8_t finger_count(cgen6_report_t *report) {
     uint8_t fingers = 0;
-    if (report->fingers[0].x != 0 || report->fingers[0].y != 0) {
+    if (report->fingers[0].tip) {
         fingers++;
     }
-    if (report->fingers[1].x != 0 || report->fingers[1].y != 0) {
+    if (report->fingers[1].tip) {
         fingers++;
     }
 
@@ -250,6 +252,14 @@ void cirque_gen_6_read_report(void) {
     }
 
     uint8_t report_id = packet[2];
+
+#ifdef CONSOLE_ENABLE
+    static uint16_t report_id_counter = 0;
+    if (++report_id_counter % 100 == 0) {
+        printf("Cirque report ID: 0x%02x (expecting 0x01 for PTP)\n", report_id);
+    }
+#endif
+
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     if (report_id == CGEN6_PTP_REPORT_ID) {
         ptp_report.fingers[0].tip = (packet[3] & 0x02) >> 1;
@@ -328,7 +338,13 @@ void navigator_trackpad_device_init(void) {
     }
 }
 
+#ifdef POINTING_DEVICE_ENABLE
 report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
+#ifdef PRECISION_TRACKPAD_ENABLE
+    // When PTP is enabled, don't send mouse reports - PTP task handles everything
+    return mouse_report;
+#else
+    // Mouse mode - process gestures and send mouse reports
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
     // Handle pending click release from previous cycle
     if (gesture.pending_click) {
@@ -388,12 +404,13 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
         bool stalled = (scroll_inertia.no_output_count > 5);    // 5 frames (~35ms) with no output
         if (velocity_too_low || stalled) {
             scroll_inertia.active = false;
-        } else {
+        } else
 #    else
         if (abs_vx < 64 && abs_vy < 64) {  // Threshold in Q8 (0.25 in real units)
             scroll_inertia.active = false;
-        } else {
+        } else
 #    endif
+        {
             // Apply scroll inversion if configured
 #    ifdef NAVIGATOR_SCROLL_INVERT_X
             mouse_report.h = -scroll_x;
@@ -407,26 +424,24 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #    endif
             return mouse_report;
         }
-#    ifndef NAVIGATOR_TRACKPAD_MACOS_SCROLLING
-        }
-#    endif
     }
 #    endif
-#endif
+#endif  // End scroll inertia block
 
+#if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
     if (!has_motion || !trackpad_init) {
         return mouse_report;
     }
 
-#if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
     mouse_report.x       = ptp_report.xDelta;
     mouse_report.y       = ptp_report.yDelta;
     mouse_report.v       = ptp_report.scrollDelta;
     mouse_report.h       = ptp_report.panDelta;
     mouse_report.buttons = ptp_report.buttons;
-#endif
-
-#if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
+#elif defined(NAVIGATOR_TRACKPAD_PTP_MODE)
+    if (!has_motion || !trackpad_init) {
+        return mouse_report;
+    }
     // Create local snapshot to avoid race condition with callback updating ptp_report
     cgen6_report_t local_report = ptp_report;
 
@@ -662,7 +677,9 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 
     has_motion = 0;
     return mouse_report;
+#endif // PRECISION_TRACKPAD_ENABLE
 }
+#endif // POINTING_DEVICE_ENABLE
 
 void set_cirque_cpi(void) {
     // traverse the sequence by compairing the cpi_x value with the current cpi_x value
@@ -724,3 +741,148 @@ void navigator_trackpad_set_cpi(uint16_t cpi) {
     }
     set_cirque_cpi();
 };
+
+#ifdef PRECISION_TRACKPAD_ENABLE
+// External declaration for PTP report sending
+extern void send_trackpad(report_trackpad_t *report);
+
+// PTP task function - converts trackpad touches to PTP reports
+void navigator_trackpad_task(void) {
+#if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
+    if (!trackpad_init) {
+        return;
+    }
+
+    // Always check for data, even if has_motion isn't set
+    // Windows needs continuous updates for gestures
+    if (!has_motion && !cirque_gen6_has_motion()) {
+        return;
+    }
+
+    // Read fresh data if available
+    if (cirque_gen6_has_motion()) {
+        cirque_gen_6_read_report();
+    }
+
+    // Create local snapshot to avoid race condition with callback
+    cgen6_report_t local_report = ptp_report;
+
+    uint8_t raw_fingers = finger_count(&local_report);
+
+#ifdef CONSOLE_ENABLE
+    // Track min/max coordinates to find actual sensor range
+    static uint16_t max_x = 0, max_y = 0;
+    static uint16_t min_x = 0xFFFF, min_y = 0xFFFF;
+    static uint16_t debug_counter = 0;
+
+    if (local_report.fingers[0].tip) {
+        if (local_report.fingers[0].x > max_x) max_x = local_report.fingers[0].x;
+        if (local_report.fingers[0].y > max_y) max_y = local_report.fingers[0].y;
+        if (local_report.fingers[0].x < min_x && local_report.fingers[0].x > 0) min_x = local_report.fingers[0].x;
+        if (local_report.fingers[0].y < min_y && local_report.fingers[0].y > 0) min_y = local_report.fingers[0].y;
+    }
+    if (local_report.fingers[1].tip) {
+        if (local_report.fingers[1].x > max_x) max_x = local_report.fingers[1].x;
+        if (local_report.fingers[1].y > max_y) max_y = local_report.fingers[1].y;
+        if (local_report.fingers[1].x < min_x && local_report.fingers[1].x > 0) min_x = local_report.fingers[1].x;
+        if (local_report.fingers[1].y < min_y && local_report.fingers[1].y > 0) min_y = local_report.fingers[1].y;
+    }
+
+    if (++debug_counter % 100 == 0) {  // Print every 100 reports
+        printf("PTP: fingers=%d, range: x=%d-%d, y=%d-%d, current: f0(%d,%d) f1(%d,%d)\n",
+                raw_fingers, min_x, max_x, min_y, max_y,
+                local_report.fingers[0].x, local_report.fingers[0].y,
+                local_report.fingers[1].x, local_report.fingers[1].y);
+    }
+#endif
+
+    // Initialize PTP report
+    report_trackpad_t ptp = {0};
+    ptp.report_id = REPORT_ID_TRACKPAD;
+
+    // Map Cirque coordinates (0-4095 in PTP mode) to PTP logical range (0-4095)
+    // Physical dimensions: 4 inches (0x190) x 2.75 inches (0x113)
+    // The Cirque sensor already provides 12-bit resolution
+
+    if (raw_fingers >= 1 && local_report.fingers[0].tip) {
+        ptp.contacts[0].confidence = 1;  // Assume intentional touch
+        ptp.contacts[0].tip = 1;
+        ptp.contacts[0].contact_id = 0;
+        ptp.contacts[0].x = local_report.fingers[0].x;  // Already 12-bit
+        ptp.contacts[0].y = local_report.fingers[0].y;
+    }
+
+    if (raw_fingers >= 2 && local_report.fingers[1].tip) {
+        ptp.contacts[1].confidence = 1;
+        ptp.contacts[1].tip = 1;
+        ptp.contacts[1].contact_id = 1;
+        ptp.contacts[1].x = local_report.fingers[1].x;
+        ptp.contacts[1].y = local_report.fingers[1].y;
+    }
+
+    // Set contact count
+    ptp.contact_count = raw_fingers;
+
+#ifdef CONSOLE_ENABLE
+    if (raw_fingers > 2) {
+        printf("ERROR: raw_fingers=%d (should be 0-2!)\n", raw_fingers);
+    }
+#endif
+
+    // Set scan time (in 100μs units)
+    // Use timer_read() which returns milliseconds, convert to 100μs units
+    ptp.scan_time = (timer_read() * 10) & 0xFFFF;
+
+    // Set button states (physical buttons from Cirque)
+    ptp.button1 = (local_report.buttons & 0x01) ? 1 : 0;
+    ptp.button2 = (local_report.buttons & 0x02) ? 1 : 0;
+    ptp.button3 = (local_report.buttons & 0x04) ? 1 : 0;
+
+    // Send the PTP report
+#ifdef CONSOLE_ENABLE
+    // Log raw bytes being sent
+    static uint16_t byte_log_counter = 0;
+    if (++byte_log_counter % 50 == 0 && raw_fingers > 0) {
+        uint8_t *bytes = (uint8_t *)&ptp;
+        printf("Sending bytes: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+               bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+               bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14]);
+    }
+#endif
+    send_trackpad(&ptp);
+
+#ifdef CONSOLE_ENABLE
+    // Detailed PTP report logging
+    static uint16_t report_counter = 0;
+    if (++report_counter % 50 == 0 || raw_fingers > 0) {  // Log every 50 reports or when touching
+        printf("PTP Report: count=%d, scan=%d, btn=%d%d%d\n",
+               ptp.contact_count, ptp.scan_time, ptp.button1, ptp.button2, ptp.button3);
+        if (ptp.contacts[0].tip) {
+            printf("  C0: id=%d, conf=%d, tip=%d, x=%d, y=%d\n",
+                   ptp.contacts[0].contact_id, ptp.contacts[0].confidence,
+                   ptp.contacts[0].tip, ptp.contacts[0].x, ptp.contacts[0].y);
+        }
+        if (ptp.contacts[1].tip) {
+            printf("  C1: id=%d, conf=%d, tip=%d, x=%d, y=%d\n",
+                   ptp.contacts[1].contact_id, ptp.contacts[1].confidence,
+                   ptp.contacts[1].tip, ptp.contacts[1].x, ptp.contacts[1].y);
+        }
+    }
+#endif
+
+    // Also send a report with no contacts when fingers lift
+    // This is critical for Windows to detect gesture end
+    static uint8_t prev_contact_count = 0;
+    if (raw_fingers == 0 && prev_contact_count > 0) {
+        // Send empty report to signal fingers lifted
+        report_trackpad_t empty_ptp = {0};
+        empty_ptp.report_id = REPORT_ID_TRACKPAD;
+        empty_ptp.scan_time = (timer_read() * 10) & 0xFFFF;
+        send_trackpad(&empty_ptp);
+    }
+    prev_contact_count = raw_fingers;
+
+    has_motion = 0;
+#endif
+}
+#endif

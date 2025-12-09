@@ -170,6 +170,12 @@ ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
     endif
 endif
 
+PRECISION_TRACKPAD_ENABLE ?= no
+ifeq ($(strip $(PRECISION_TRACKPAD_ENABLE)), yes)
+    OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
+    SRC += $(QUANTUM_DIR)/precision_trackpad.c
+endif
+
 QUANTUM_PAINTER_ENABLE ?= no
 ifeq ($(strip $(QUANTUM_PAINTER_ENABLE)), yes)
     include $(QUANTUM_DIR)/painter/rules.mk

@@ -36,6 +36,7 @@ bool set_scrolling = false;
 bool navigator_turbo = false;
 bool navigator_aim = false;
 
+#ifdef POINTING_DEVICE_ENABLE
 report_mouse_t pointing_device_task_kb(report_mouse_t mouse_report) {
     // Turbo mode is used to increase the speed of the mouse cursor
     // by multiplying the x and y values by a factor.
@@ -126,3 +127,4 @@ report_mouse_t pointing_device_task_kb(report_mouse_t mouse_report) {
     }
     return mouse_report;
 }
+#endif // POINTING_DEVICE_ENABLE

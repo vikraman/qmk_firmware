@@ -116,6 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef VIRTSER_ENABLE
 #    include "virtser.h"
 #endif
+#ifdef PRECISION_TRACKPAD_ENABLE
+#    include "precision_trackpad.h"
+#endif
 #ifdef SLEEP_LED_ENABLE
 #    include "sleep_led.h"
 #endif
@@ -341,6 +344,10 @@ __attribute__((weak)) void keyboard_post_init_modules(void) {}
 void keyboard_post_init_quantum(void) {
     keyboard_post_init_modules();
     keyboard_post_init_kb();
+
+#ifdef PRECISION_TRACKPAD_ENABLE
+    precision_trackpad_init();
+#endif
 }
 
 /** \brief matrix_can_read
@@ -758,6 +765,12 @@ void keyboard_task(void) {
 #ifdef POINTING_DEVICE_ENABLE
     if (pointing_device_task()) {
         last_pointing_device_activity_trigger();
+        activity_has_occurred = true;
+    }
+#endif
+
+#ifdef PRECISION_TRACKPAD_ENABLE
+    if (precision_trackpad_task()) {
         activity_has_occurred = true;
     }
 #endif

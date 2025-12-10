@@ -1,0 +1,373 @@
+// Copyright 2025 ZSA Technology Labs, Inc <contact@zsa.io>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Common hardware layer for Navigator trackpad
+// Shared by both mouse and PTP implementations
+
+#include <stdint.h>
+#include <sys/types.h>
+#include "navigator_trackpad_common.h"
+#include "i2c_master.h"
+#include "quantum.h"
+#include "timer.h"
+
+// Shared globals
+deferred_token callback_token = 0;
+uint16_t       current_cpi    = DEFAULT_CPI_TICK;
+uint8_t        has_motion     = 0;
+bool           trackpad_init  = false;
+cgen6_report_t ptp_report;
+
+// I2C communication functions
+i2c_status_t cirque_gen6_read_report(uint8_t *data, uint16_t cnt) {
+    i2c_status_t res = i2c_receive(NAVIGATOR_TRACKPAD_ADDRESS, data, cnt, NAVIGATOR_TRACKPAD_TIMEOUT);
+    if (res != I2C_STATUS_SUCCESS) {
+        return res;
+    }
+    wait_us(cnt * 15);
+    return res;
+}
+
+void cirque_gen6_clear(void) {
+    uint8_t buf[CGEN6_MAX_PACKET_SIZE];
+    for (uint8_t i = 0; i < 5; i++) {
+        wait_ms(1);
+        if (cirque_gen6_read_report(buf, CGEN6_MAX_PACKET_SIZE) != I2C_STATUS_SUCCESS) {
+            break;
+        }
+    }
+}
+
+uint8_t cirque_gen6_read_memory(uint32_t addr, uint8_t *data, uint16_t cnt, bool fast_read) {
+    uint8_t  cksum = 0;
+    uint8_t  res   = CGEN6_SUCCESS;
+    uint8_t  len[2];
+    uint16_t read = 0;
+
+    uint8_t preamble[8] = {0x01, 0x09, (uint8_t)(addr & (uint32_t)0x000000FF), (uint8_t)((addr & 0x0000FF00) >> 8), (uint8_t)((addr & 0x00FF0000) >> 16), (uint8_t)((addr & 0xFF000000) >> 24), (uint8_t)(cnt & 0x00FF), (uint8_t)((cnt & 0xFF00) >> 8)};
+
+    // Read the length of the data + 3 bytes (first 2 bytes for the length and the last byte for the checksum)
+    // Create a buffer to store the data
+    uint8_t buf[cnt + 3];
+    if (i2c_transmit_and_receive(NAVIGATOR_TRACKPAD_ADDRESS, preamble, 8, buf, cnt + 3, NAVIGATOR_TRACKPAD_TIMEOUT) != I2C_STATUS_SUCCESS) {
+        res |= CGEN6_I2C_FAILED;
+        trackpad_init = false;
+    }
+
+    // Read the data length
+    for (uint8_t i = 0; i < 2; i++) {
+        cksum += len[i] = buf[i];
+        read++;
+    }
+
+    // Populate the data buffer
+    for (uint16_t i = 2; i < cnt + 2; i++) {
+        cksum += data[i - 2] = buf[i];
+        read++;
+    }
+
+    if (!fast_read) {
+        // Check the checksum
+        if (cksum != buf[read]) {
+            res |= CGEN6_CKSUM_FAILED;
+        }
+
+        // Check the length (incremented first to account for the checksum)
+        if (++read != (len[0] | (len[1] << 8))) {
+            res |= CGEN6_LEN_MISMATCH;
+        }
+
+        wait_ms(1);
+    } else {
+        wait_us(250);
+    }
+
+    return res;
+}
+
+uint8_t cirque_gen6_write_memory(uint32_t addr, uint8_t *data, uint16_t cnt) {
+    uint8_t res   = CGEN6_SUCCESS;
+    uint8_t cksum = 0, i = 0;
+    uint8_t preamble[8] = {0x00, 0x09, (uint8_t)(addr & 0x000000FF), (uint8_t)((addr & 0x0000FF00) >> 8), (uint8_t)((addr & 0x00FF0000) >> 16), (uint8_t)((addr & 0xFF000000) >> 24), (uint8_t)(cnt & 0x00FF), (uint8_t)((cnt & 0xFF00) >> 8)};
+
+    uint8_t buf[cnt + 9];
+    // Calculate the checksum
+    for (; i < 8; i++) {
+        cksum += buf[i] = preamble[i];
+    }
+
+    for (i = 0; i < cnt; i++) {
+        cksum += buf[i + 8] = data[i];
+    }
+
+    buf[cnt + 8] = cksum;
+
+    if (i2c_transmit(NAVIGATOR_TRACKPAD_ADDRESS, buf, cnt + 9, NAVIGATOR_TRACKPAD_TIMEOUT) != I2C_STATUS_SUCCESS) {
+        res |= CGEN6_I2C_FAILED;
+        trackpad_init = false;
+    }
+
+    wait_ms(1);
+
+    return res;
+}
+
+// Register access functions
+uint8_t cirque_gen6_read_reg(uint32_t addr, bool fast_read) {
+    uint8_t data;
+    uint8_t res = cirque_gen6_read_memory(addr, &data, 1, fast_read);
+    if (res != CGEN6_SUCCESS) {
+        printf("Failed to read 8bits from register at address 0x%08X with error 0x%02X\n", (u_int)addr, res);
+        return 0;
+    }
+    return data;
+}
+
+uint16_t cirque_gen6_read_reg_16(uint32_t addr) {
+    uint8_t buf[2];
+    uint8_t res = cirque_gen6_read_memory(addr, buf, 2, false);
+    if (res != CGEN6_SUCCESS) {
+        printf("Failed to read 16bits from register at address 0x%08X with error 0x%02X\n", (u_int)addr, res);
+        return 0;
+    }
+    return (buf[1] << 8) | buf[0];
+}
+
+uint32_t cirque_gen6_read_reg_32(uint32_t addr) {
+    uint8_t buf[4];
+    uint8_t res = cirque_gen6_read_memory(addr, buf, 4, false);
+    if (res != CGEN6_SUCCESS) {
+        printf("Failed to read 32bits from register at address 0x%08X with error 0x%02X\n", (u_int)addr, res);
+        return 0;
+    }
+    return (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
+}
+
+uint8_t cirque_gen6_write_reg(uint32_t addr, uint8_t data) {
+    return cirque_gen6_write_memory(addr, &data, 1);
+}
+
+uint8_t cirque_gen6_write_reg_16(uint32_t addr, uint16_t data) {
+    uint8_t buf[2] = {data & 0xFF, (data >> 8) & 0xFF};
+    return cirque_gen6_write_memory(addr, buf, 2);
+}
+
+uint8_t cirque_gen6_write_reg_32(uint32_t addr, uint32_t data) {
+    uint8_t buf[4] = {data & 0xFF, (data >> 8) & 0xFF, (data >> 16) & 0xFF, (data >> 24) & 0xFF};
+    return cirque_gen6_write_memory(addr, buf, 4);
+}
+
+// Configuration functions
+uint8_t cirque_gen6_set_relative_mode(void) {
+    uint8_t feed_config4 = cirque_gen6_read_reg(CGEN6_FEED_CONFIG4, false);
+    feed_config4 &= 0xF3;
+    return cirque_gen6_write_reg(CGEN6_FEED_CONFIG4, feed_config4);
+}
+
+uint8_t cirque_gen6_set_ptp_mode(void) {
+    uint8_t feed_config4 = cirque_gen6_read_reg(CGEN6_FEED_CONFIG4, false);
+    feed_config4 &= 0xF7;
+    feed_config4 |= 0x04;
+    return cirque_gen6_write_reg(CGEN6_FEED_CONFIG4, feed_config4);
+}
+
+uint8_t cirque_gen6_swap_xy(bool set) {
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
+    if (set) {
+        xy_config |= 0x04;
+    } else {
+        xy_config &= ~0x04;
+    }
+    return cirque_gen6_write_reg(CGEN6_XY_CONFIG, xy_config);
+}
+
+uint8_t cirque_gen6_invert_y(bool set) {
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
+    if (set) {
+        xy_config |= 0x02;
+    } else {
+        xy_config &= ~0x02;
+    }
+    return cirque_gen6_write_reg(CGEN6_XY_CONFIG, xy_config);
+}
+
+uint8_t cirque_gen6_invert_x(bool set) {
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
+    if (set) {
+        xy_config |= 0x01;
+    } else {
+        xy_config &= ~0x01;
+    }
+    return cirque_gen6_write_reg(CGEN6_XY_CONFIG, xy_config);
+}
+
+uint8_t cirque_gen6_enable_logical_scaling(bool set) {
+    uint8_t xy_config = cirque_gen6_read_reg(CGEN6_XY_CONFIG, false);
+    if (set) {
+        xy_config &= ~0x08;
+    } else {
+        xy_config |= 0x08;
+    }
+    return cirque_gen6_write_reg(CGEN6_XY_CONFIG, xy_config);
+}
+
+// Motion detection
+uint8_t cirque_gen6_has_motion(void) {
+    return cirque_gen6_read_reg(CGEN6_I2C_DR, true);
+}
+
+// Report reading - fills ptp_report global
+void cirque_gen_6_read_report(void) {
+    uint8_t packet[CGEN6_MAX_PACKET_SIZE];
+    if (cirque_gen6_read_report(packet, CGEN6_MAX_PACKET_SIZE) != I2C_STATUS_SUCCESS) {
+        return;
+    }
+
+    uint8_t report_id = packet[2];
+
+    // PTP mode report
+    if (report_id == CGEN6_PTP_REPORT_ID) {
+        ptp_report.fingers[0].tip = (packet[3] & 0x02) >> 1;
+        ptp_report.fingers[0].x   = packet[5] << 8 | packet[4];
+        ptp_report.fingers[0].y   = packet[7] << 8 | packet[6];
+        ptp_report.fingers[1].tip = (packet[8] & 0x02) >> 1;
+        ptp_report.fingers[1].x   = packet[10] << 8 | packet[9];
+        ptp_report.fingers[1].y   = packet[12] << 8 | packet[11];
+        ptp_report.scan_time      = packet[14] << 8 | packet[13];
+        ptp_report.buttons        = packet[16];
+    }
+    // Mouse/relative mode report
+    else if (report_id == CGEN6_MOUSE_REPORT_ID) {
+        ptp_report.buttons     = packet[3];
+        ptp_report.xDelta      = packet[4];
+        ptp_report.yDelta      = packet[5];
+        ptp_report.scrollDelta = packet[6];
+        ptp_report.panDelta    = packet[7];
+        has_motion             = 1;
+    }
+}
+
+// Deferred callback for polling
+uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg) {
+    if (!trackpad_init) {
+        navigator_trackpad_device_init();
+        return NAVIGATOR_TRACKPAD_PROBE;
+    }
+    if (cirque_gen6_has_motion()) {
+        has_motion = 1;
+        cirque_gen_6_read_report();
+    }
+    return NAVIGATOR_TRACKPAD_READ;
+}
+
+// Device initialization
+void navigator_trackpad_device_init(void) {
+    i2c_init();
+    i2c_status_t status = i2c_ping_address(NAVIGATOR_TRACKPAD_ADDRESS, NAVIGATOR_TRACKPAD_TIMEOUT);
+    if (status != I2C_STATUS_SUCCESS) {
+        trackpad_init = false;
+        return;
+    }
+    cirque_gen6_clear();
+    wait_ms(50);
+
+    uint8_t res = CGEN6_SUCCESS;
+#if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
+    res = cirque_gen6_set_ptp_mode();
+#elif defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
+    res = cirque_gen6_set_relative_mode();
+#endif
+
+    if (res != CGEN6_SUCCESS) {
+        return;
+    }
+
+    // Reset to the default alignment
+    cirque_gen6_swap_xy(false);
+    cirque_gen6_invert_x(false);
+    cirque_gen6_invert_y(false);
+    cirque_gen6_swap_xy(true);
+    cirque_gen6_invert_x(true);
+    cirque_gen6_invert_y(true);
+    cirque_gen6_enable_logical_scaling(true);
+
+    trackpad_init = true;
+    // Only register the callback for the first time
+    if (!callback_token) {
+        callback_token = defer_exec(NAVIGATOR_TRACKPAD_READ, cirque_gen6_read_callback, NULL);
+    }
+}
+
+// CPI management
+void set_cirque_cpi(void) {
+    // traverse the sequence by comparing the cpi_x value with the current cpi_x value
+    // set the cpi to the next value in the sequence
+    switch (current_cpi) {
+        case CPI_1: {
+            current_cpi = CPI_2;
+            break;
+        }
+        case CPI_2: {
+            current_cpi = CPI_3;
+            break;
+        }
+        case CPI_3: {
+            current_cpi = CPI_4;
+            break;
+        }
+        case CPI_4: {
+            current_cpi = CPI_5;
+            break;
+        }
+        case CPI_5: {
+            current_cpi = CPI_6;
+            break;
+        }
+        case CPI_6: {
+            current_cpi = CPI_7;
+            break;
+        }
+        case CPI_7: {
+            current_cpi = CPI_1;
+            break;
+        }
+        default: {
+            current_cpi = CPI_4;
+            break;
+        }
+    }
+}
+
+uint16_t navigator_trackpad_get_cpi(void) {
+    return current_cpi;
+}
+
+void restore_cpi(uint8_t cpi) {
+    current_cpi = cpi;
+    set_cirque_cpi();
+}
+
+void navigator_trackpad_set_cpi(uint16_t cpi) {
+    if (cpi == 0) { // Decrease one tick
+        if (current_cpi > 1) {
+            current_cpi--;
+        }
+    } else {
+        if (current_cpi < CPI_TICKS) {
+            current_cpi++;
+        }
+    }
+    set_cirque_cpi();
+}
+
+// Helper function to count active fingers
+uint8_t cirque_gen6_finger_count(cgen6_report_t *report) {
+    uint8_t fingers = 0;
+    if (report->fingers[0].tip) {
+        fingers++;
+    }
+    if (report->fingers[1].tip) {
+        fingers++;
+    }
+    return fingers;
+}

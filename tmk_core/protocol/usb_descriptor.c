@@ -385,8 +385,11 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
 #endif
 
 #ifdef PRECISION_TRACKPAD_ENABLE
+// Include trackpad dimensions
+#include "drivers/sensors/navigator_trackpad_common.h"
+
 // Windows Precision Touchpad (PTP) HID Descriptor
-// Based on Microsoft PTP specification
+// Follows Microsoft PTP specification exactly
 const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
     // Touch Pad Input TLC
     HID_RI_USAGE_PAGE(8, 0x0D),                         // Digitizers
@@ -394,7 +397,7 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
     HID_RI_COLLECTION(8, 0x01),                         // Application
         HID_RI_REPORT_ID(8, REPORT_ID_TRACKPAD),
 
-        // First finger
+        // First finger (contact 0)
         HID_RI_USAGE(8, 0x22),                          // Finger
         HID_RI_COLLECTION(8, 0x02),                     // Logical
             HID_RI_LOGICAL_MINIMUM(8, 0x00),
@@ -416,21 +419,22 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
             // X/Y position
             HID_RI_USAGE_PAGE(8, 0x01),                 // Generic Desktop
             HID_RI_LOGICAL_MINIMUM(8, 0x00),
-            HID_RI_LOGICAL_MAXIMUM(16, 0x0384),         // 900 (actual Cirque range: 1-897)
+            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),  // 4095 (12-bit resolution)
             HID_RI_REPORT_SIZE(8, 0x10),
-            HID_RI_UNIT_EXPONENT(8, 0x0E),              // -2
+            HID_RI_UNIT_EXPONENT(8, 0x0E),              // -2 (hundredths)
             HID_RI_UNIT(8, 0x13),                       // Inch, English Linear
             HID_RI_PHYSICAL_MINIMUM(8, 0x00),
-            HID_RI_PHYSICAL_MAXIMUM(16, 0x009D),        // 157 (1.57 inches / 40mm)
+            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_WIDTH),   // Physical width in 0.01 inch
             HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_USAGE(8, 0x30),                      // X
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_PHYSICAL_MAXIMUM(16, 0x009D),        // 157 (1.57 inches / 40mm)
+            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_HEIGHT), // Physical height in 0.01 inch
             HID_RI_USAGE(8, 0x31),                      // Y
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
         HID_RI_END_COLLECTION(0),
 
         // Second finger (identical structure)
+        HID_RI_USAGE_PAGE(8, 0x0D),                     // Digitizers (switch back!)
         HID_RI_USAGE(8, 0x22),                          // Finger
         HID_RI_COLLECTION(8, 0x02),                     // Logical
             HID_RI_LOGICAL_MINIMUM(8, 0x00),
@@ -451,22 +455,21 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
 
             HID_RI_USAGE_PAGE(8, 0x01),                 // Generic Desktop
             HID_RI_LOGICAL_MINIMUM(8, 0x00),
-            HID_RI_LOGICAL_MAXIMUM(16, 0x0384),         // 900 (actual Cirque range: 1-897)
+            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),  // 4095 (12-bit resolution)
             HID_RI_REPORT_SIZE(8, 0x10),
             HID_RI_UNIT_EXPONENT(8, 0x0E),
             HID_RI_UNIT(8, 0x13),
             HID_RI_PHYSICAL_MINIMUM(8, 0x00),
-            HID_RI_PHYSICAL_MAXIMUM(16, 0x009D),        // 157 (1.57 inches / 40mm)
+            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_WIDTH),   // Physical width in 0.01 inch
             HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_USAGE(8, 0x30),                      // X
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_PHYSICAL_MAXIMUM(16, 0x009D),        // 157 (1.57 inches / 40mm)
+            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_HEIGHT), // Physical height in 0.01 inch
             HID_RI_USAGE(8, 0x31),                      // Y
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
         HID_RI_END_COLLECTION(0),
 
-        // Scan Time
-        HID_RI_USAGE_PAGE(8, 0x0D),                     // Digitizers
+        // Scan Time (comes AFTER contacts per Microsoft spec)
         HID_RI_UNIT_EXPONENT(8, 0x0C),                  // -4
         HID_RI_UNIT(16, 0x1001),                        // Seconds
         HID_RI_LOGICAL_MINIMUM(8, 0x00),
@@ -475,10 +478,11 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
         HID_RI_PHYSICAL_MAXIMUM(32, 0x0000FFFF),
         HID_RI_REPORT_SIZE(8, 0x10),
         HID_RI_REPORT_COUNT(8, 0x01),
+        HID_RI_USAGE_PAGE(8, 0x0D),                     // Digitizers
         HID_RI_USAGE(8, 0x56),                          // Scan Time
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
 
-        // Contact Count
+        // Contact Count (8 bits, not 4!)
         HID_RI_USAGE(8, 0x54),                          // Contact Count
         HID_RI_LOGICAL_MAXIMUM(8, 0x7F),
         HID_RI_REPORT_SIZE(8, 0x08),

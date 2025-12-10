@@ -40,14 +40,16 @@ enum hid_report_ids {
     REPORT_ID_JOYSTICK,
     REPORT_ID_DIGITIZER,
 
-    // PTP trackpad uses its own report ID sequence starting at 0x01
-    // to match Windows PTP HID specification
-    REPORT_ID_TRACKPAD = 0x01,
-    REPORT_ID_TRACKPAD_CONFIG = 0x0A,
-    REPORT_ID_TRACKPAD_FEATURE = 0x0B,
-    REPORT_ID_TRACKPAD_MAX_COUNT = 0x0C,
-    REPORT_ID_TRACKPAD_PTPHQA = 0x0D,
-    REPORT_ID_COUNT = REPORT_ID_TRACKPAD_PTPHQA
+    // PTP trackpad uses separate report IDs (per Microsoft PTP specification)
+    // These don't auto-increment from above, they're on a separate interface
+    REPORT_ID_TRACKPAD = 0x01,           // Input report (multi-touch data)
+    REPORT_ID_TRACKPAD_MAX_COUNT = 0x02, // Feature: Contact Count Maximum
+    REPORT_ID_TRACKPAD_CONFIG = 0x03,    // Feature: Input Mode configuration
+    REPORT_ID_TRACKPAD_FEATURE = 0x04,   // Feature: Surface/Button switches
+    REPORT_ID_TRACKPAD_PTPHQA = 0x05,    // Feature: Certification blob
+
+    // REPORT_ID_COUNT must be the highest ID from the auto-incrementing sequence
+    REPORT_ID_COUNT = REPORT_ID_DIGITIZER  // Highest report ID value
 };
 
 #define IS_VALID_REPORT_ID(id) ((id) >= REPORT_ID_ALL && (id) <= REPORT_ID_COUNT)
@@ -260,6 +262,7 @@ typedef struct {
 } PACKED report_trackpad_contact_t;
 
 // Main trackpad input report
+// Field order per Microsoft PTP spec: [ReportID][Contacts][ScanTime][Count][Buttons]
 typedef struct {
     uint8_t                     report_id;     // Report ID for trackpad
     report_trackpad_contact_t   contacts[2];   // Up to 2 simultaneous contacts

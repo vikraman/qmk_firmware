@@ -4,24 +4,39 @@
 #include "precision_trackpad.h"
 #include "timer.h"
 
-// Weak functions that can be overridden by keyboard-specific implementations
-__attribute__((weak)) void precision_trackpad_init_kb(void) {}
-__attribute__((weak)) bool precision_trackpad_task_kb(void) {
-    return false;
-}
+// Include the driver implementation
+#if defined(PRECISION_TRACKPAD_DRIVER_NAVIGATOR_TRACKPAD)
+#    include "drivers/sensors/navigator_trackpad_ptp.h"
+#endif
+
+// Driver selection (resolved at compile time by build system)
+const precision_trackpad_driver_t *precision_trackpad_driver =
+    &PRECISION_TRACKPAD_DRIVER(PRECISION_TRACKPAD_DRIVER_NAME);
 
 void precision_trackpad_init(void) {
-    precision_trackpad_init_kb();
+    if (precision_trackpad_driver && precision_trackpad_driver->init) {
+        precision_trackpad_driver->init();
+    }
 }
 
 bool precision_trackpad_task(void) {
-    static uint32_t last_update = 0;
-
-    // Throttle updates to 125Hz (8ms) to avoid overwhelming USB
-    if (timer_elapsed32(last_update) < 8) {
-        return false;
+    // No throttling - let the driver control timing
+    // PTP mode needs responsive updates for gesture recognition
+    if (precision_trackpad_driver && precision_trackpad_driver->task) {
+        return precision_trackpad_driver->task();
     }
+    return false;
+}
 
-    last_update = timer_read32();
-    return precision_trackpad_task_kb();
+void precision_trackpad_set_cpi(uint16_t cpi) {
+    if (precision_trackpad_driver && precision_trackpad_driver->set_cpi) {
+        precision_trackpad_driver->set_cpi(cpi);
+    }
+}
+
+uint16_t precision_trackpad_get_cpi(void) {
+    if (precision_trackpad_driver && precision_trackpad_driver->get_cpi) {
+        return precision_trackpad_driver->get_cpi();
+    }
+    return 0;
 }

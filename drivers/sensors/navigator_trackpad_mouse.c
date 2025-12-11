@@ -23,6 +23,11 @@ const pointing_device_driver_t navigator_trackpad_pointing_device_driver = {
 trackpad_gesture_t  gesture = {0};
 extern bool         set_scrolling;  // Declared in navigator.c
 
+#ifndef PRECISION_TRACKPAD_ENABLE
+// Local sensor report for mouse mode (not used when PTP is enabled)
+static cgen6_report_t ptp_report;
+#endif
+
 #ifdef NAVIGATOR_TRACKPAD_SCROLL_INERTIA_ENABLE
 scroll_inertia_t    scroll_inertia = {0};
 #endif
@@ -122,7 +127,7 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
 #endif  // End scroll inertia block
 
 #if defined(NAVIGATOR_TRACKPAD_RELATIVE_MODE)
-    if (!has_motion || !trackpad_init) {
+    if (!trackpad_init) {
         return mouse_report;
     }
 
@@ -132,7 +137,7 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
     mouse_report.h       = ptp_report.panDelta;
     mouse_report.buttons = ptp_report.buttons;
 #elif defined(NAVIGATOR_TRACKPAD_PTP_MODE)
-    if (!has_motion || !trackpad_init) {
+    if (!trackpad_init) {
         return mouse_report;
     }
     // Create local snapshot to avoid race condition with callback updating ptp_report
@@ -368,7 +373,6 @@ report_mouse_t navigator_trackpad_get_report(report_mouse_t mouse_report) {
     }
 #endif
 
-    has_motion = 0;
     return mouse_report;
 #endif // PRECISION_TRACKPAD_ENABLE
 }

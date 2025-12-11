@@ -9,139 +9,116 @@
 #include "precision_trackpad_drivers.h"
 #include "quantum.h"
 #include "report.h"
+#include "timer.h"
 
 #ifdef PRECISION_TRACKPAD_ENABLE
 
-// External declaration for PTP report sending
-extern void send_trackpad(report_trackpad_t *report);
+// External declaration for report sending
+extern void send_trackpad(report_digitizer_t *report);
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 
-// PTP task function - converts trackpad touches to PTP reports
+// Build a finger's 6 bytes into the report buffer
+// Format: [conf:1 + tip:1 + pad:6] [contact_id:3 + pad:5] [X_lo] [X_hi] [Y_lo] [Y_hi]
+// For PTP, we always send contact_id and coordinates. Only tip changes.
+static void build_finger_bytes(uint8_t *buf, uint8_t contact_id, uint16_t x, uint16_t y, bool tip) {
+    buf[0] = tip ? 0x03 : 0x01;  // confidence=1 always, tip varies
+    buf[1] = contact_id & 0x07;  // contact_id in bits 0-2
+    buf[2] = x & 0xFF;           // X low byte
+    buf[3] = (x >> 8) & 0xFF;    // X high byte
+    buf[4] = y & 0xFF;           // Y low byte
+    buf[5] = (y >> 8) & 0xFF;    // Y high byte
+}
+
+// PTP task function - synchronous polling with timer-based throttling
 static bool navigator_trackpad_ptp_task(void) {
-    if (!has_motion || !trackpad_init) {
+    static uint32_t last_poll_time  = 0;
+    static uint32_t last_probe_time = 0;
+    static uint8_t  prev_buttons = 0;
+    // Track previous finger state to detect lift-offs
+    static bool     prev_finger0_tip = false;
+    static bool     prev_finger1_tip = false;
+
+    uint32_t now = timer_read32();
+
+    // Throttle polling to NAVIGATOR_TRACKPAD_POLL_INTERVAL_MS
+    if (timer_elapsed32(last_poll_time) < NAVIGATOR_TRACKPAD_POLL_INTERVAL_MS) {
+        return false;
+    }
+    last_poll_time = now;
+
+    // Handle disconnected/uninitialized state with slower probe interval
+    if (!trackpad_init) {
+        if (timer_elapsed32(last_probe_time) < NAVIGATOR_TRACKPAD_PROBE_INTERVAL_MS) {
+            return false;
+        }
+        last_probe_time = now;
+        navigator_trackpad_device_init();
         return false;
     }
 
-    // Create local snapshot to avoid race condition with callback
-    cgen6_report_t local_report = ptp_report;
-
-    uint8_t raw_fingers = cirque_gen6_finger_count(&local_report);
-
-    // Initialize PTP report
-    report_trackpad_t ptp = {0};
-    ptp.report_id = REPORT_ID_TRACKPAD;
-
-    // Sensitivity scaling: Track previous RAW sensor position and accumulated scaled position
-    // Apply sensitivity only to the delta from raw sensor, then accumulate
-    static uint16_t prev_raw_x[2] = {0, 0};
-    static uint16_t prev_raw_y[2] = {0, 0};
-    static uint16_t accum_x[2] = {0, 0};
-    static uint16_t accum_y[2] = {0, 0};
-    static bool     was_touching[2] = {false, false};
-
-    if (local_report.fingers[0].tip) {
-        uint16_t raw_x = local_report.fingers[0].x;
-        uint16_t raw_y = local_report.fingers[0].y;
-
-        if (was_touching[0]) {
-            // Calculate delta from RAW sensor data
-            int16_t delta_x = (int16_t)(raw_x - prev_raw_x[0]);
-            int16_t delta_y = (int16_t)(raw_y - prev_raw_y[0]);
-
-            // Apply sensitivity to the delta
-            delta_x = (int16_t)((float)delta_x * NAVIGATOR_TRACKPAD_SENSITIVITY);
-            delta_y = (int16_t)((float)delta_y * NAVIGATOR_TRACKPAD_SENSITIVITY);
-
-            // Add scaled delta to accumulated position
-            int32_t new_x = (int32_t)accum_x[0] + delta_x;
-            int32_t new_y = (int32_t)accum_y[0] + delta_y;
-
-            // Clamp to valid range
-            if (new_x < 0) new_x = 0;
-            if (new_x > 4095) new_x = 4095;
-            if (new_y < 0) new_y = 0;
-            if (new_y > 4095) new_y = 4095;
-
-            accum_x[0] = (uint16_t)new_x;
-            accum_y[0] = (uint16_t)new_y;
-        } else {
-            // First touch - initialize accumulated position to raw position
-            accum_x[0] = raw_x;
-            accum_y[0] = raw_y;
-        }
-
-        ptp.contacts[0].confidence = 1;
-        ptp.contacts[0].tip = 1;
-        ptp.contacts[0].contact_id = 0;
-        ptp.contacts[0].x = accum_x[0];
-        ptp.contacts[0].y = accum_y[0];
-
-        prev_raw_x[0] = raw_x;
-        prev_raw_y[0] = raw_y;
-        was_touching[0] = true;
-    } else {
-        was_touching[0] = false;
+    // Read the report data into local struct
+    cgen6_report_t sensor_report = {0};
+    if (!cirque_gen_6_read_report(&sensor_report)) {
+        return false;
     }
 
-    if (local_report.fingers[1].tip) {
-        uint16_t raw_x = local_report.fingers[1].x;
-        uint16_t raw_y = local_report.fingers[1].y;
+    // Current finger states
+    bool finger0_tip = sensor_report.fingers[0].tip;
+    bool finger1_tip = sensor_report.fingers[1].tip;
 
-        if (was_touching[1]) {
-            // Calculate delta from RAW sensor data
-            int16_t delta_x = (int16_t)(raw_x - prev_raw_x[1]);
-            int16_t delta_y = (int16_t)(raw_y - prev_raw_y[1]);
+    // Determine if each finger should be included in contact_count
+    // Include finger if: currently touching OR was touching last frame (lift-off)
+    bool finger0_contact = finger0_tip || prev_finger0_tip;
+    bool finger1_contact = finger1_tip || prev_finger1_tip;
 
-            // Apply sensitivity to the delta
-            delta_x = (int16_t)((float)delta_x * NAVIGATOR_TRACKPAD_SENSITIVITY);
-            delta_y = (int16_t)((float)delta_y * NAVIGATOR_TRACKPAD_SENSITIVITY);
+    uint8_t buttons = sensor_report.buttons & 0x01;
+    bool button_changed = (buttons != prev_buttons);
 
-            // Add scaled delta to accumulated position
-            int32_t new_x = (int32_t)accum_x[1] + delta_x;
-            int32_t new_y = (int32_t)accum_y[1] + delta_y;
+    // Contact count includes fingers that are touching OR lifting off this frame
+    uint8_t contact_count = (finger0_contact ? 1 : 0) + (finger1_contact ? 1 : 0);
 
-            // Clamp to valid range
-            if (new_x < 0) new_x = 0;
-            if (new_x > 4095) new_x = 4095;
-            if (new_y < 0) new_y = 0;
-            if (new_y > 4095) new_y = 4095;
+    // Build report from sensor data using explicit byte manipulation
+    // Report format (16 bytes): [report_id] [finger0: 6 bytes] [finger1: 6 bytes] [scan_time: 2 bytes] [count+buttons: 1 byte]
+    uint8_t report[16] = {0};
 
-            accum_x[1] = (uint16_t)new_x;
-            accum_y[1] = (uint16_t)new_y;
-        } else {
-            // First touch - initialize accumulated position to raw position
-            accum_x[1] = raw_x;
-            accum_y[1] = raw_y;
-        }
+    // Byte 0: Report ID
+    report[0] = 0x01;
 
-        ptp.contacts[1].confidence = 1;
-        ptp.contacts[1].tip = 1;
-        ptp.contacts[1].contact_id = 1;
-        ptp.contacts[1].x = accum_x[1];
-        ptp.contacts[1].y = accum_y[1];
-
-        prev_raw_x[1] = raw_x;
-        prev_raw_y[1] = raw_y;
-        was_touching[1] = true;
-    } else {
-        was_touching[1] = false;
+    // Bytes 1-6: Finger 0 (include if touching or lifting off)
+    if (finger0_contact) {
+        build_finger_bytes(&report[1], 0,
+                           sensor_report.fingers[0].x,
+                           sensor_report.fingers[0].y,
+                           finger0_tip);
     }
 
-    // Set scan time, contact count, and buttons (after contacts per Microsoft spec)
-    // Use the sensor's scan_time for accurate gesture velocity calculation
-    ptp.scan_time = local_report.scan_time;
-    ptp.contact_count = raw_fingers;
-    ptp.button1 = (local_report.buttons & 0x01) ? 1 : 0;
-    ptp.button2 = (local_report.buttons & 0x02) ? 1 : 0;
-    ptp.button3 = (local_report.buttons & 0x04) ? 1 : 0;
-
-    if (raw_fingers > 0) {
-        send_trackpad(&ptp);
+    // Bytes 7-12: Finger 1 (include if touching or lifting off)
+    if (finger1_contact) {
+        build_finger_bytes(&report[7], 1,
+                           sensor_report.fingers[1].x,
+                           sensor_report.fingers[1].y,
+                           finger1_tip);
     }
 
-    has_motion = 0;
-    return true;
+    // Bytes 13-14: Scan time (little-endian)
+    report[13] = sensor_report.scan_time & 0xFF;
+    report[14] = (sensor_report.scan_time >> 8) & 0xFF;
+
+    // Byte 15: Contact count (bits 0-3) + buttons (bits 4-6)
+    report[15] = (contact_count & 0x0F) | ((buttons & 0x01) << 4);
+
+    // Send report if any contacts (including lift-offs) or button changed
+    if (contact_count > 0 || button_changed) {
+        send_trackpad((report_digitizer_t *)report);
+    }
+
+    // Update previous state
+    prev_finger0_tip = finger0_tip;
+    prev_finger1_tip = finger1_tip;
+    prev_buttons = buttons;
+
+    return contact_count > 0 || button_changed;
 }
 #else
 // Stub for when PTP mode is not enabled
@@ -152,7 +129,7 @@ static bool navigator_trackpad_ptp_task(void) {
 
 // Internal init function
 static void navigator_trackpad_ptp_init(void) {
-    navigator_trackpad_device_init();  // Common init
+    navigator_trackpad_device_init();
 }
 
 // Driver registration

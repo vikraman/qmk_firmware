@@ -5,11 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "i2c_master.h"
-#include "deferred_exec.h"
 
-// I2C configuration
-#define NAVIGATOR_TRACKPAD_READ 7
-#define NAVIGATOR_TRACKPAD_PROBE 1000
+// Polling intervals (in ms)
+#define NAVIGATOR_TRACKPAD_POLL_INTERVAL_MS 3    // Minimum interval between sensor queries
+#define NAVIGATOR_TRACKPAD_PROBE_INTERVAL_MS 1000 // Interval for probing disconnected device
 
 #ifndef NAVIGATOR_TRACKPAD_ADDRESS
 #    define NAVIGATOR_TRACKPAD_ADDRESS 0x58
@@ -69,13 +68,15 @@
 #    define TRACKPAD_PHYSICAL_HEIGHT 157  // 1.57 inches (40mm actual size)
 #endif
 
-// Logical coordinate range from Cirque Gen6 sensor in PTP mode
-// Actual usable range is approximately 1-897, rounded to 900
-#define TRACKPAD_LOGICAL_MAX 900
+// Logical coordinate range from Cirque Gen6 sensor in PTP mode (raw, no scaling)
+// Actual usable range is approximately 280-2018, rounded to 2048
+#define TRACKPAD_LOGICAL_MAX 2048
 
 // Common finger structure (used by both mouse and PTP modes)
 typedef struct {
     uint8_t  tip;
+    uint8_t  confidence;
+    uint8_t  id;
     uint16_t x;
     uint16_t y;
 } cgen6_finger_t;
@@ -84,11 +85,12 @@ typedef struct {
 typedef struct {
     cgen6_finger_t fingers[2];
     uint8_t        buttons;
-    uint16_t       scan_time;   // Sensor timestamp (100μs units) - used by PTP mode
-    int8_t         xDelta;      // Used by mouse mode
-    int8_t         yDelta;      // Used by mouse mode
-    int8_t         scrollDelta; // Used by mouse mode
-    int8_t         panDelta;    // Used by mouse mode
+    uint8_t        contact_count; // Number of active contacts - used by PTP mode
+    uint16_t       scan_time;     // Sensor timestamp (100μs units) - used by PTP mode
+    int8_t         xDelta;        // Used by mouse mode
+    int8_t         yDelta;        // Used by mouse mode
+    int8_t         scrollDelta;   // Used by mouse mode
+    int8_t         panDelta;      // Used by mouse mode
 } cgen6_report_t;
 
 // Low-level I2C functions
@@ -114,11 +116,10 @@ uint8_t cirque_gen6_invert_x(bool set);
 uint8_t cirque_gen6_enable_logical_scaling(bool set);
 
 // Motion detection and report reading
-uint8_t cirque_gen6_has_motion(void);
-void    cirque_gen_6_read_report(void);
-
-// Deferred callback
-uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg);
+// Returns true if motion data is ready, false otherwise (including I2C failure)
+bool cirque_gen6_has_motion(void);
+// Reads report data into provided report struct. Returns true on success, false on I2C failure.
+bool cirque_gen_6_read_report(cgen6_report_t *report);
 
 // Device initialization
 void navigator_trackpad_device_init(void);
@@ -129,11 +130,8 @@ void     navigator_trackpad_set_cpi(uint16_t cpi);
 void     restore_cpi(uint8_t cpi);
 
 // Shared globals
-extern deferred_token callback_token;
 extern uint16_t       current_cpi;
-extern uint8_t        has_motion;
 extern bool           trackpad_init;
-extern cgen6_report_t ptp_report;  // Shared between modes
 
 // Helper functions
 uint8_t cirque_gen6_finger_count(cgen6_report_t *report);

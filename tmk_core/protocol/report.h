@@ -39,17 +39,12 @@ enum hid_report_ids {
     REPORT_ID_NKRO,
     REPORT_ID_JOYSTICK,
     REPORT_ID_DIGITIZER,
-
-    // PTP trackpad uses separate report IDs (per Microsoft PTP specification)
-    // These don't auto-increment from above, they're on a separate interface
-    REPORT_ID_TRACKPAD = 0x01,           // Input report (multi-touch data)
-    REPORT_ID_TRACKPAD_MAX_COUNT = 0x02, // Feature: Contact Count Maximum
-    REPORT_ID_TRACKPAD_CONFIG = 0x03,    // Feature: Input Mode configuration
-    REPORT_ID_TRACKPAD_FEATURE = 0x04,   // Feature: Surface/Button switches
-    REPORT_ID_TRACKPAD_PTPHQA = 0x05,    // Feature: Certification blob
-
-    // REPORT_ID_COUNT must be the highest ID from the auto-incrementing sequence
-    REPORT_ID_COUNT = REPORT_ID_DIGITIZER  // Highest report ID value
+    REPORT_ID_DIGITIZER_STYLUS,
+    REPORT_ID_DIGITIZER_CONFIGURATION,
+    REPORT_ID_DIGITIZER_GET_FEATURE,
+    REPORT_ID_DIGITIZER_FUNCTION_SWITCH,
+    REPORT_ID_DIGITIZER_CERTIFICATE,
+    REPORT_ID_COUNT = REPORT_ID_DIGITIZER_CERTIFICATE
 };
 
 #define IS_VALID_REPORT_ID(id) ((id) >= REPORT_ID_ALL && (id) <= REPORT_ID_COUNT)
@@ -239,71 +234,53 @@ typedef struct {
 } PACKED report_mouse_t;
 
 typedef struct {
-#ifdef DIGITIZER_SHARED_EP
-    uint8_t report_id;
-#endif
-    bool     in_range : 1;
-    bool     tip : 1;
-    bool     barrel : 1;
+    uint8_t  report_id;
+    uint8_t  in_range : 1;
+    uint8_t  tip : 1;
+    uint8_t  barrel : 1;
     uint8_t  reserved : 5;
     uint16_t x;
     uint16_t y;
+} PACKED report_digitizer_stylus_t;
+
+// Digitizer/Touchpad report structures
+// Per-contact data structure - 6 bytes per contact
+// Byte layout: [conf:1 + tip:1 + pad:6] [id:3 + pad:5] [X low] [X high] [Y low] [Y high]
+typedef struct {
+    uint8_t  confidence : 1;
+    uint8_t  tip : 1;
+    uint8_t  reserved : 6;
+    uint8_t  contact_id : 3;
+    uint8_t  reserved2 : 5;
+    uint16_t x;
+    uint16_t y;
+} PACKED digitizer_finger_report_t;
+
+// Main digitizer/touchpad input report
+// Field order: [ReportID][Contacts...][ScanTime][Count:4+Buttons:3+Pad:1]
+#ifndef DIGITIZER_CONTACT_COUNT
+#define DIGITIZER_CONTACT_COUNT 2
+#endif
+
+typedef struct {
+    uint8_t report_id;
+#if DIGITIZER_CONTACT_COUNT > 0
+    digitizer_finger_report_t fingers[DIGITIZER_CONTACT_COUNT];
+#endif
+    uint16_t scan_time;
+    uint8_t  contact_count : 4;
+    uint8_t  button1 : 1;
+    uint8_t  button2 : 1;
+    uint8_t  button3 : 1;
+    uint8_t  reserved2 : 1;
 } PACKED report_digitizer_t;
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-// Per-contact data structure for PTP
-typedef struct {
-    bool     confidence : 1;  // Confidence bit (1 = intentional touch, 0 = palm/accidental)
-    bool     tip : 1;          // Tip switch (contact state)
-    uint8_t  contact_id : 2;   // Contact identifier (0-based, supports up to 4 contacts)
-    uint8_t  reserved : 4;     // Reserved/padding bits
-    uint16_t x;                // Absolute X position
-    uint16_t y;                // Absolute Y position
-} PACKED report_trackpad_contact_t;
+// Verify structure sizes
+_Static_assert(sizeof(digitizer_finger_report_t) == 6, "digitizer_finger_report_t must be 6 bytes");
+_Static_assert(sizeof(report_digitizer_t) == 16, "report_digitizer_t must be 16 bytes");
 
-// Main trackpad input report
-// Field order per Microsoft PTP spec: [ReportID][Contacts][ScanTime][Count][Buttons]
-typedef struct {
-    uint8_t                     report_id;     // Report ID for trackpad
-    report_trackpad_contact_t   contacts[2];   // Up to 2 simultaneous contacts
-    uint16_t                    scan_time;     // Scan time in 100μs units
-    uint8_t                     contact_count; // Number of active contacts
-    uint8_t                     button1 : 1;   // Physical button 1
-    uint8_t                     button2 : 1;   // Physical button 2
-    uint8_t                     button3 : 1;   // Physical button 3
-    uint8_t                     button_pad : 5; // Padding for buttons
-} PACKED report_trackpad_t;
-
-// Compile-time assertion to verify structure size
-_Static_assert(sizeof(report_trackpad_t) == 15, "report_trackpad_t must be exactly 15 bytes");
-
-// Feature report for device capabilities
-typedef struct {
-    uint8_t report_id;           // REPORT_ID_TRACKPAD_MAX_COUNT
-    uint8_t max_contact_count : 4; // Maximum number of contacts (2)
-    uint8_t pad_type : 4;        // Pad type (0 = depressible click-pad, 1 = pressure pad)
-} PACKED report_trackpad_max_count_t;
-
-// Feature report for configuration
-typedef struct {
-    uint8_t report_id;    // REPORT_ID_TRACKPAD_CONFIG
-    uint8_t input_mode;   // Input mode (0 = mouse, 3 = multi-touch)
-} PACKED report_trackpad_config_t;
-
-// Feature report for function switches
-typedef struct {
-    uint8_t report_id;       // REPORT_ID_TRACKPAD_FEATURE
-    uint8_t surface_switch : 1; // Surface switch (0 = enabled, 1 = disabled)
-    uint8_t button_switch : 1;  // Button switch (0 = enabled, 1 = disabled)
-    uint8_t reserved : 6;
-} PACKED report_trackpad_feature_t;
-
-// Vendor-specific certification blob (256 bytes)
-typedef struct {
-    uint8_t report_id;    // REPORT_ID_TRACKPAD_PTPHQA
-    uint8_t blob[256];    // Certification status blob
-} PACKED report_trackpad_ptphqa_t;
-#endif
+// Legacy alias for compatibility
+typedef report_digitizer_t report_trackpad_t;
 
 #if JOYSTICK_AXIS_RESOLUTION > 8
 typedef int16_t joystick_axis_t;

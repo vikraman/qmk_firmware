@@ -12,11 +12,8 @@
 #include "timer.h"
 
 // Shared globals
-deferred_token callback_token = 0;
-uint16_t       current_cpi    = DEFAULT_CPI_TICK;
-uint8_t        has_motion     = 0;
-bool           trackpad_init  = false;
-cgen6_report_t ptp_report;
+uint16_t       current_cpi   = DEFAULT_CPI_TICK;
+bool           trackpad_init = false;
 
 // I2C communication functions
 i2c_status_t cirque_gen6_read_report(uint8_t *data, uint16_t cnt) {
@@ -211,56 +208,60 @@ uint8_t cirque_gen6_enable_logical_scaling(bool set) {
     return cirque_gen6_write_reg(CGEN6_XY_CONFIG, xy_config);
 }
 
-// Motion detection
-uint8_t cirque_gen6_has_motion(void) {
-    return cirque_gen6_read_reg(CGEN6_I2C_DR, true);
+// Motion detection - returns true if data ready, false on no motion or I2C failure
+bool cirque_gen6_has_motion(void) {
+    uint8_t data;
+    uint8_t res = cirque_gen6_read_memory(CGEN6_I2C_DR, &data, 1, true);
+    if (res != CGEN6_SUCCESS) {
+        trackpad_init = false;
+        return false;
+    }
+    return data != 0;
 }
 
-// Report reading - fills ptp_report global
-void cirque_gen_6_read_report(void) {
+// Report reading - fills provided report struct. Returns true on valid data, false on I2C failure or no data.
+bool cirque_gen_6_read_report(cgen6_report_t *report) {
     uint8_t packet[CGEN6_MAX_PACKET_SIZE];
     if (cirque_gen6_read_report(packet, CGEN6_MAX_PACKET_SIZE) != I2C_STATUS_SUCCESS) {
-        return;
+        trackpad_init = false;
+        return false;
     }
 
     uint8_t report_id = packet[2];
 
     // PTP mode report
     if (report_id == CGEN6_PTP_REPORT_ID) {
-        ptp_report.fingers[0].tip = (packet[3] & 0x02) >> 1;
-        ptp_report.fingers[0].x   = packet[5] << 8 | packet[4];
-        ptp_report.fingers[0].y   = packet[7] << 8 | packet[6];
-        ptp_report.fingers[1].tip = (packet[8] & 0x02) >> 1;
-        ptp_report.fingers[1].x   = packet[10] << 8 | packet[9];
-        ptp_report.fingers[1].y   = packet[12] << 8 | packet[11];
-        ptp_report.scan_time      = packet[14] << 8 | packet[13];
-        ptp_report.buttons        = packet[16];
+        report->fingers[0].confidence = packet[3] & 0x01;
+        report->fingers[0].tip        = (packet[3] & 0x02) >> 1;
+        report->fingers[0].id         = (packet[3] & 0xFC) >> 2;
+        report->fingers[0].x          = packet[5] << 8 | packet[4];
+        report->fingers[0].y          = packet[7] << 8 | packet[6];
+        report->fingers[1].confidence = packet[8] & 0x01;
+        report->fingers[1].tip        = (packet[8] & 0x02) >> 1;
+        report->fingers[1].id         = (packet[8] & 0xFC) >> 2;
+        report->fingers[1].x          = packet[10] << 8 | packet[9];
+        report->fingers[1].y          = packet[12] << 8 | packet[11];
+        report->scan_time             = packet[14] << 8 | packet[13];
+        report->contact_count         = packet[15];
+        report->buttons               = packet[16];
+
+        return true;
     }
     // Mouse/relative mode report
     else if (report_id == CGEN6_MOUSE_REPORT_ID) {
-        ptp_report.buttons     = packet[3];
-        ptp_report.xDelta      = packet[4];
-        ptp_report.yDelta      = packet[5];
-        ptp_report.scrollDelta = packet[6];
-        ptp_report.panDelta    = packet[7];
-        has_motion             = 1;
+        report->buttons     = packet[3];
+        report->xDelta      = packet[4];
+        report->yDelta      = packet[5];
+        report->scrollDelta = packet[6];
+        report->panDelta    = packet[7];
+        return true;
     }
+
+    // Unknown or empty report - no valid data
+    return false;
 }
 
-// Deferred callback for polling
-uint32_t cirque_gen6_read_callback(uint32_t trigger_time, void *cb_arg) {
-    if (!trackpad_init) {
-        navigator_trackpad_device_init();
-        return NAVIGATOR_TRACKPAD_PROBE;
-    }
-    if (cirque_gen6_has_motion()) {
-        has_motion = 1;
-        cirque_gen_6_read_report();
-    }
-    return NAVIGATOR_TRACKPAD_READ;
-}
-
-// Device initialization
+// Device initialization - returns true on success, false on failure
 void navigator_trackpad_device_init(void) {
     i2c_init();
     i2c_status_t status = i2c_ping_address(NAVIGATOR_TRACKPAD_ADDRESS, NAVIGATOR_TRACKPAD_TIMEOUT);
@@ -279,23 +280,16 @@ void navigator_trackpad_device_init(void) {
 #endif
 
     if (res != CGEN6_SUCCESS) {
+        trackpad_init = false;
         return;
     }
 
-    // Reset to the default alignment
-    cirque_gen6_swap_xy(false);
-    cirque_gen6_invert_x(false);
-    cirque_gen6_invert_y(false);
     cirque_gen6_swap_xy(true);
     cirque_gen6_invert_x(true);
     cirque_gen6_invert_y(true);
-    cirque_gen6_enable_logical_scaling(true);
+    cirque_gen6_enable_logical_scaling(false);  // Disable scaling for raw coordinates
 
     trackpad_init = true;
-    // Only register the callback for the first time
-    if (!callback_token) {
-        callback_token = defer_exec(NAVIGATOR_TRACKPAD_READ, cirque_gen6_read_callback, NULL);
-    }
 }
 
 // CPI management

@@ -388,166 +388,206 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
 // Include trackpad dimensions
 #include "drivers/sensors/navigator_trackpad_common.h"
 
-// Windows Precision Touchpad (PTP) HID Descriptor
-// Follows Microsoft PTP specification exactly
+// Digitizer/Touchpad HID Descriptor
 const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
-    // Touch Pad Input TLC
-    HID_RI_USAGE_PAGE(8, 0x0D),                         // Digitizers
-    HID_RI_USAGE(8, 0x05),                              // Touch Pad
-    HID_RI_COLLECTION(8, 0x01),                         // Application
-        HID_RI_REPORT_ID(8, REPORT_ID_TRACKPAD),
+    HID_RI_USAGE_PAGE(8, 0x0D),            // Digitizers
+    HID_RI_USAGE(8, 0x05),                 // Touchpad
+    HID_RI_COLLECTION(8, 0x01),            // Application
+        // Use report ID 1 for touchpad input (separate interface has own ID space)
+        HID_RI_REPORT_ID(8, 0x01),
 
-        // First finger (contact 0)
-        HID_RI_USAGE(8, 0x22),                          // Finger
-        HID_RI_COLLECTION(8, 0x02),                     // Logical
+        // Contact 1
+        HID_RI_USAGE(8, 0x22),             // Finger
+        HID_RI_COLLECTION(8, 0x00),        // Physical
+            HID_RI_PUSH(0),
             HID_RI_LOGICAL_MINIMUM(8, 0x00),
             HID_RI_LOGICAL_MAXIMUM(8, 0x01),
-            HID_RI_USAGE(8, 0x47),                      // Confidence
-            HID_RI_USAGE(8, 0x42),                      // Tip Switch
+            // Tip Switch, Confidence (2 bits)
+            HID_RI_USAGE(8, 0x47),         // Confidence
+            HID_RI_USAGE(8, 0x42),         // Tip Switch
             HID_RI_REPORT_COUNT(8, 0x02),
             HID_RI_REPORT_SIZE(8, 0x01),
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_REPORT_SIZE(8, 0x02),
-            HID_RI_REPORT_COUNT(8, 0x01),
-            HID_RI_LOGICAL_MAXIMUM(8, 0x02),
-            HID_RI_USAGE(8, 0x51),                      // Contact Identifier
-            HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_REPORT_SIZE(8, 0x01),
-            HID_RI_REPORT_COUNT(8, 0x04),
-            HID_RI_INPUT(8, HID_IOF_CONSTANT),          // Padding
 
-            // X/Y position
-            HID_RI_USAGE_PAGE(8, 0x01),                 // Generic Desktop
-            HID_RI_LOGICAL_MINIMUM(8, 0x00),
-            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),  // 4095 (12-bit resolution)
-            HID_RI_REPORT_SIZE(8, 0x10),
-            HID_RI_UNIT_EXPONENT(8, 0x0E),              // -2 (hundredths)
-            HID_RI_UNIT(8, 0x13),                       // Inch, English Linear
-            HID_RI_PHYSICAL_MINIMUM(8, 0x00),
-            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_WIDTH),   // Physical width in 0.01 inch
+            // Padding (6 bits)
+            HID_RI_REPORT_SIZE(8, 0x01),
+            HID_RI_REPORT_COUNT(8, 0x06),
+            HID_RI_INPUT(8, HID_IOF_CONSTANT),
+
+            // Contact identifier (3 bits)
             HID_RI_REPORT_COUNT(8, 0x01),
-            HID_RI_USAGE(8, 0x30),                      // X
+            HID_RI_REPORT_SIZE(8, 0x03),
+            HID_RI_LOGICAL_MAXIMUM(8, 0x05),
+            HID_RI_USAGE(8, 0x51),         // Contact identifier
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_HEIGHT), // Physical height in 0.01 inch
-            HID_RI_USAGE(8, 0x31),                      // Y
+
+            // Padding (5 bits)
+            HID_RI_REPORT_SIZE(8, 0x01),
+            HID_RI_REPORT_COUNT(8, 0x05),
+            HID_RI_INPUT(8, HID_IOF_CONSTANT),
+
+            // X/Y Position (4 bytes)
+            HID_RI_USAGE_PAGE(8, 0x01),    // Generic Desktop
+            HID_RI_LOGICAL_MINIMUM(8, 0x0),
+            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),
+            HID_RI_REPORT_SIZE(8, 16),
+            HID_RI_UNIT_EXPONENT(8, 0x0E), // -2
+            HID_RI_UNIT(8, 0x11),          // CM, English Linear
+            HID_RI_USAGE(8, 0x30),         // X
+            HID_RI_PHYSICAL_MINIMUM(8, 0x0),
+            HID_RI_PHYSICAL_MAXIMUM(16, (TRACKPAD_PHYSICAL_WIDTH)),
+            HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),
+            HID_RI_PHYSICAL_MAXIMUM(16, (TRACKPAD_PHYSICAL_HEIGHT)),
+            HID_RI_USAGE(8, 0x31),         // Y
+            HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+            HID_RI_POP(0),
         HID_RI_END_COLLECTION(0),
 
-        // Second finger (identical structure)
-        HID_RI_USAGE_PAGE(8, 0x0D),                     // Digitizers (switch back!)
-        HID_RI_USAGE(8, 0x22),                          // Finger
-        HID_RI_COLLECTION(8, 0x02),                     // Logical
+        // Contact 2
+        HID_RI_USAGE_PAGE(8, 0x0D),        // Digitizers
+        HID_RI_USAGE(8, 0x22),             // Finger
+        HID_RI_COLLECTION(8, 0x00),        // Physical
+            HID_RI_PUSH(0),
             HID_RI_LOGICAL_MINIMUM(8, 0x00),
             HID_RI_LOGICAL_MAXIMUM(8, 0x01),
-            HID_RI_USAGE(8, 0x47),                      // Confidence
-            HID_RI_USAGE(8, 0x42),                      // Tip Switch
+            // Tip Switch, Confidence (2 bits)
+            HID_RI_USAGE(8, 0x47),         // Confidence
+            HID_RI_USAGE(8, 0x42),         // Tip Switch
             HID_RI_REPORT_COUNT(8, 0x02),
             HID_RI_REPORT_SIZE(8, 0x01),
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_REPORT_SIZE(8, 0x02),
-            HID_RI_REPORT_COUNT(8, 0x01),
-            HID_RI_LOGICAL_MAXIMUM(8, 0x02),
-            HID_RI_USAGE(8, 0x51),                      // Contact Identifier
-            HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_REPORT_SIZE(8, 0x01),
-            HID_RI_REPORT_COUNT(8, 0x04),
-            HID_RI_INPUT(8, HID_IOF_CONSTANT),          // Padding
 
-            HID_RI_USAGE_PAGE(8, 0x01),                 // Generic Desktop
-            HID_RI_LOGICAL_MINIMUM(8, 0x00),
-            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),  // 4095 (12-bit resolution)
-            HID_RI_REPORT_SIZE(8, 0x10),
-            HID_RI_UNIT_EXPONENT(8, 0x0E),
-            HID_RI_UNIT(8, 0x13),
-            HID_RI_PHYSICAL_MINIMUM(8, 0x00),
-            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_WIDTH),   // Physical width in 0.01 inch
+            // Padding (6 bits)
+            HID_RI_REPORT_SIZE(8, 0x01),
+            HID_RI_REPORT_COUNT(8, 0x06),
+            HID_RI_INPUT(8, HID_IOF_CONSTANT),
+
+            // Contact identifier (3 bits)
             HID_RI_REPORT_COUNT(8, 0x01),
-            HID_RI_USAGE(8, 0x30),                      // X
+            HID_RI_REPORT_SIZE(8, 0x03),
+            HID_RI_LOGICAL_MAXIMUM(8, 0x05),
+            HID_RI_USAGE(8, 0x51),         // Contact identifier
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_PHYSICAL_MAXIMUM(16, TRACKPAD_PHYSICAL_HEIGHT), // Physical height in 0.01 inch
-            HID_RI_USAGE(8, 0x31),                      // Y
+
+            // Padding (5 bits)
+            HID_RI_REPORT_SIZE(8, 0x01),
+            HID_RI_REPORT_COUNT(8, 0x05),
+            HID_RI_INPUT(8, HID_IOF_CONSTANT),
+
+            // X/Y Position (4 bytes)
+            HID_RI_USAGE_PAGE(8, 0x01),    // Generic Desktop
+            HID_RI_LOGICAL_MINIMUM(8, 0x0),
+            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),
+            HID_RI_REPORT_SIZE(8, 16),
+            HID_RI_UNIT_EXPONENT(8, 0x0E), // -2
+            HID_RI_UNIT(8, 0x11),          // CM, English Linear
+            HID_RI_USAGE(8, 0x30),         // X
+            HID_RI_PHYSICAL_MINIMUM(8, 0x0),
+            HID_RI_PHYSICAL_MAXIMUM(16, (TRACKPAD_PHYSICAL_WIDTH)),
+            HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+            HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),
+            HID_RI_PHYSICAL_MAXIMUM(16, (TRACKPAD_PHYSICAL_HEIGHT)),
+            HID_RI_USAGE(8, 0x31),         // Y
+            HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+            HID_RI_POP(0),
         HID_RI_END_COLLECTION(0),
 
-        // Scan Time (comes AFTER contacts per Microsoft spec)
-        HID_RI_UNIT_EXPONENT(8, 0x0C),                  // -4
-        HID_RI_UNIT(16, 0x1001),                        // Seconds
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(32, 0x0000FFFF),
-        HID_RI_PHYSICAL_MINIMUM(8, 0x00),
-        HID_RI_PHYSICAL_MAXIMUM(32, 0x0000FFFF),
-        HID_RI_REPORT_SIZE(8, 0x10),
+        // Scan Time and Contact Count
+        HID_RI_PUSH(0),
+        HID_RI_UNIT_EXPONENT(8, 0x0C),  // -4
+        HID_RI_UNIT(16, 0x1001),        // Seconds, SI Linear
+        HID_RI_USAGE_PAGE(8, 0x0D),    // Digitizers
+        HID_RI_USAGE(8, 0x56),         // Scan Time
+        HID_RI_PHYSICAL_MINIMUM(0),
+        HID_RI_LOGICAL_MINIMUM(0),
+        HID_RI_PHYSICAL_MAXIMUM(32, 65535),
+        HID_RI_LOGICAL_MAXIMUM(32, 65535),
+        HID_RI_REPORT_SIZE(8, 16),
         HID_RI_REPORT_COUNT(8, 0x01),
-        HID_RI_USAGE_PAGE(8, 0x0D),                     // Digitizers
-        HID_RI_USAGE(8, 0x56),                          // Scan Time
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-
-        // Contact Count (8 bits, not 4!)
-        HID_RI_USAGE(8, 0x54),                          // Contact Count
-        HID_RI_LOGICAL_MAXIMUM(8, 0x7F),
-        HID_RI_REPORT_SIZE(8, 0x08),
+        HID_RI_USAGE(8, 0x54),         // Contact count
+        HID_RI_LOGICAL_MAXIMUM(8, 5),
         HID_RI_REPORT_COUNT(8, 0x01),
+        HID_RI_REPORT_SIZE(8, 0x04),
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
 
         // Buttons
-        HID_RI_USAGE_PAGE(8, 0x09),                     // Button
-        HID_RI_USAGE(8, 0x01),                          // Button 1
-        HID_RI_USAGE(8, 0x02),                          // Button 2
-        HID_RI_USAGE(8, 0x03),                          // Button 3
-        HID_RI_LOGICAL_MAXIMUM(8, 0x01),
-        HID_RI_REPORT_SIZE(8, 0x01),
-        HID_RI_REPORT_COUNT(8, 0x03),
+        HID_RI_USAGE_PAGE(8, 0x09),    // Buttons
+        HID_RI_USAGE(8, 0x01),         // Button 1
+        HID_RI_USAGE(8, 0x02),         // Button 2
+        HID_RI_USAGE(8, 0x03),         // Button 3
+        HID_RI_LOGICAL_MAXIMUM(8, 1),
+        HID_RI_REPORT_SIZE(8, 1),
+        HID_RI_REPORT_COUNT(8, 3),
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-        HID_RI_REPORT_COUNT(8, 0x05),                   // Padding
+
+        // Padding (1 bit)
+        HID_RI_REPORT_SIZE(8, 0x01),
+        HID_RI_REPORT_COUNT(8, 0x01),
         HID_RI_INPUT(8, HID_IOF_CONSTANT),
 
-        // Feature reports
-        HID_RI_USAGE_PAGE(8, 0x0D),                     // Digitizers
-        HID_RI_REPORT_ID(8, REPORT_ID_TRACKPAD_MAX_COUNT),
-        HID_RI_USAGE(8, 0x55),                          // Contact Count Maximum
-        HID_RI_USAGE(8, 0x59),                          // Pad Type
+        // Feature: Contact Count Maximum + Pad Type
+        HID_RI_USAGE_PAGE(8, 0x0D),    // Digitizers
+        HID_RI_REPORT_ID(8, 0x02),     // Feature report ID 2
+        HID_RI_USAGE(8, 0x55),         // Contact Count Maximum
         HID_RI_REPORT_SIZE(8, 0x04),
-        HID_RI_REPORT_COUNT(8, 0x02),
-        HID_RI_LOGICAL_MAXIMUM(8, 0x0F),
+        HID_RI_REPORT_COUNT(8, 0x01),
+        HID_RI_LOGICAL_MAXIMUM(8, 15),
+        HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+        HID_RI_USAGE(8, 0x59),         // Pad type
+        HID_RI_REPORT_SIZE(8, 0x03),
+        HID_RI_REPORT_COUNT(8, 0x01),
+        HID_RI_LOGICAL_MAXIMUM(8, 7),
+        HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+        HID_RI_USAGE(8, 0x57),         // Surface switch
+        HID_RI_REPORT_SIZE(8, 0x01),
+        HID_RI_REPORT_COUNT(8, 0x01),
+        HID_RI_LOGICAL_MAXIMUM(8, 1),
         HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
 
-        // Certification blob
-        HID_RI_USAGE_PAGE(16, 0xFF00),                  // Vendor Defined
-        HID_RI_REPORT_ID(8, REPORT_ID_TRACKPAD_PTPHQA),
-        HID_RI_USAGE(8, 0xC5),                          // Vendor Usage 0xC5
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(16, 0x00FF),
+        // Feature: Certification blob (256 bytes)
+        HID_RI_USAGE_PAGE(16, 0xFF),           // Vendor
+        HID_RI_REPORT_ID(8, 0x03),             // Feature report ID 3
+        HID_RI_USAGE(8, 0xC5),                 // Vendor usage
+        HID_RI_LOGICAL_MAXIMUM(16, 255),
         HID_RI_REPORT_SIZE(8, 0x08),
-        HID_RI_REPORT_COUNT(16, 0x0100),                // 256 bytes
+        HID_RI_REPORT_COUNT(16, 256),
         HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+
+        HID_RI_POP(0),
     HID_RI_END_COLLECTION(0),
 
     // Configuration TLC
-    HID_RI_USAGE_PAGE(8, 0x0D),                         // Digitizers
-    HID_RI_USAGE(8, 0x0E),                              // Configuration
-    HID_RI_COLLECTION(8, 0x01),                         // Application
-        HID_RI_REPORT_ID(8, REPORT_ID_TRACKPAD_CONFIG),
-        HID_RI_USAGE(8, 0x22),                          // Finger
-        HID_RI_COLLECTION(8, 0x02),                     // Logical
-            HID_RI_USAGE(8, 0x52),                      // Input Mode
-            HID_RI_LOGICAL_MINIMUM(8, 0x00),
-            HID_RI_LOGICAL_MAXIMUM(8, 0x0A),
-            HID_RI_REPORT_SIZE(8, 0x08),
+    HID_RI_USAGE_PAGE(8, 0x0D),            // Digitizers
+    HID_RI_USAGE(8, 0x0E),                 // Configuration
+    HID_RI_COLLECTION(8, 0x01),            // Application
+        HID_RI_PUSH(0),
+        HID_RI_REPORT_ID(8, 0x04),         // Feature report ID 4
+        HID_RI_USAGE(8, 0x22),                 // Finger
+        HID_RI_COLLECTION(8, 0x02),            // Logical
+            HID_RI_USAGE(8, 0x52),                 // Input mode
+            HID_RI_LOGICAL_MINIMUM(8, 0),
+            HID_RI_LOGICAL_MAXIMUM(8, 10),
             HID_RI_REPORT_COUNT(8, 0x01),
+            HID_RI_REPORT_SIZE(8, 0x08),
             HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
         HID_RI_END_COLLECTION(0),
 
-        HID_RI_USAGE(8, 0x22),                          // Finger
-        HID_RI_COLLECTION(8, 0x00),                     // Physical
-            HID_RI_REPORT_ID(8, REPORT_ID_TRACKPAD_FEATURE),
-            HID_RI_USAGE(8, 0x57),                      // Surface Switch
-            HID_RI_USAGE(8, 0x58),                      // Button Switch
-            HID_RI_REPORT_SIZE(8, 0x01),
+        HID_RI_USAGE(8, 0x22),                 // Finger
+        HID_RI_COLLECTION(8, 0x00),            // Physical
+            HID_RI_REPORT_ID(8, 0x05),         // Feature report ID 5
+            HID_RI_USAGE(8, 0x57),                 // Surface switch
+            HID_RI_USAGE(8, 0x58),                 // Button switch
+            HID_RI_LOGICAL_MAXIMUM(8, 1),
             HID_RI_REPORT_COUNT(8, 0x02),
-            HID_RI_LOGICAL_MAXIMUM(8, 0x01),
+            HID_RI_REPORT_SIZE(8, 0x01),
             HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-            HID_RI_REPORT_COUNT(8, 0x06),               // Padding
-            HID_RI_FEATURE(8, HID_IOF_CONSTANT),
+            HID_RI_REPORT_COUNT(8, 0x06),
+            HID_RI_FEATURE(8, HID_IOF_CONSTANT | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+            HID_RI_POP(0),
         HID_RI_END_COLLECTION(0),
     HID_RI_END_COLLECTION(0),
 };

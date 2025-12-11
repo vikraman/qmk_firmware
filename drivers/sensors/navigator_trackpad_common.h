@@ -7,7 +7,7 @@
 #include "i2c_master.h"
 
 // Polling intervals (in ms)
-#define NAVIGATOR_TRACKPAD_POLL_INTERVAL_MS 3    // Minimum interval between sensor queries
+#define NAVIGATOR_TRACKPAD_POLL_INTERVAL_MS 5    // Minimum interval between sensor queries
 #define NAVIGATOR_TRACKPAD_PROBE_INTERVAL_MS 1000 // Interval for probing disconnected device
 
 #ifndef NAVIGATOR_TRACKPAD_ADDRESS
@@ -61,11 +61,13 @@
 // Navigator trackpad is circular, 40mm diameter (1.575 inches actual)
 // We report larger physical dimensions to maintain good cursor speed
 // The OS uses this ratio to calculate movement sensitivity
+
+#define TRACkbPAD_DIMENSIONS_FACTOR 5
 #ifndef TRACKPAD_PHYSICAL_WIDTH
-#    define TRACKPAD_PHYSICAL_WIDTH 157   // 1.57 inches (40mm actual size)
+#    define TRACKPAD_PHYSICAL_WIDTH 157 * TRACkbPAD_DIMENSIONS_FACTOR   // 1.57 inches (40mm actual size)
 #endif
 #ifndef TRACKPAD_PHYSICAL_HEIGHT
-#    define TRACKPAD_PHYSICAL_HEIGHT 157  // 1.57 inches (40mm actual size)
+#    define TRACKPAD_PHYSICAL_HEIGHT 157 * TRACkbPAD_DIMENSIONS_FACTOR  // 1.57 inches (40mm actual size)
 #endif
 
 // Logical coordinate range from Cirque Gen6 sensor in PTP mode (raw, no scaling)

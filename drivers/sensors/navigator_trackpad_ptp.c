@@ -20,9 +20,8 @@ extern void send_trackpad(report_digitizer_t *report);
 
 // Build a finger's 6 bytes into the report buffer
 // Format: [conf:1 + tip:1 + pad:6] [contact_id:3 + pad:5] [X_lo] [X_hi] [Y_lo] [Y_hi]
-// For PTP, we always send contact_id and coordinates. Only tip changes.
-static void build_finger_bytes(uint8_t *buf, uint8_t contact_id, uint16_t x, uint16_t y, bool tip) {
-    buf[0] = tip ? 0x03 : 0x01;  // confidence=1 always, tip varies
+static void build_finger_bytes(uint8_t *buf, uint8_t contact_id, uint16_t x, uint16_t y, bool tip, bool confidence) {
+    buf[0] = (confidence ? 0x01 : 0x00) | (tip ? 0x02 : 0x00);
     buf[1] = contact_id & 0x07;  // contact_id in bits 0-2
     buf[2] = x & 0xFF;           // X low byte
     buf[3] = (x >> 8) & 0xFF;    // X high byte
@@ -63,9 +62,9 @@ static bool navigator_trackpad_ptp_task(void) {
         return false;
     }
 
-    // Current finger states
-    bool finger0_tip = sensor_report.fingers[0].tip;
-    bool finger1_tip = sensor_report.fingers[1].tip;
+    // Current finger states - require both tip AND confidence from sensor
+    bool finger0_tip = sensor_report.fingers[0].tip && sensor_report.fingers[0].confidence;
+    bool finger1_tip = sensor_report.fingers[1].tip && sensor_report.fingers[1].confidence;
 
     // Determine if each finger should be included in contact_count
     // Include finger if: currently touching OR was touching last frame (lift-off)
@@ -90,7 +89,8 @@ static bool navigator_trackpad_ptp_task(void) {
         build_finger_bytes(&report[1], 0,
                            sensor_report.fingers[0].x,
                            sensor_report.fingers[0].y,
-                           finger0_tip);
+                           finger0_tip,
+                           sensor_report.fingers[0].confidence);
     }
 
     // Bytes 7-12: Finger 1 (include if touching or lifting off)
@@ -98,10 +98,11 @@ static bool navigator_trackpad_ptp_task(void) {
         build_finger_bytes(&report[7], 1,
                            sensor_report.fingers[1].x,
                            sensor_report.fingers[1].y,
-                           finger1_tip);
+                           finger1_tip,
+                           sensor_report.fingers[1].confidence);
     }
 
-    // Bytes 13-14: Scan time (little-endian)
+    // Bytes 13-14: Scan time
     report[13] = sensor_report.scan_time & 0xFF;
     report[14] = (sensor_report.scan_time >> 8) & 0xFF;
 

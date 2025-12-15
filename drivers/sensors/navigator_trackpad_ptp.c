@@ -3,6 +3,7 @@
 
 // PTP (Precision Touchpad) mode implementation for Navigator trackpad
 // Converts Cirque Gen 6 sensor data to Windows Precision Touchpad HID reports
+// Also provides a fallback mouse collection for systems that don't support PTP
 
 #include "navigator_trackpad_ptp.h"
 #include "navigator_trackpad_common.h"
@@ -13,8 +14,29 @@
 
 #ifdef PRECISION_TRACKPAD_ENABLE
 
-// External declaration for report sending
+// External declaration for report sending (used for both PTP and mouse reports)
 extern void send_trackpad(report_digitizer_t *report);
+
+// Input mode: 0 = Mouse, 3 = PTP
+// Defined in usb_main.c
+extern uint8_t get_trackpad_input_mode(void);
+
+#define TRACKPAD_INPUT_MODE_MOUSE 0
+#define TRACKPAD_INPUT_MODE_PTP   3
+
+// Fallback mouse configuration
+#ifndef TRACKPAD_MOUSE_SENSITIVITY
+#    define TRACKPAD_MOUSE_SENSITIVITY 1.0f
+#endif
+
+// Tap-to-click configuration
+#ifndef TRACKPAD_TAP_TERM_MS
+#    define TRACKPAD_TAP_TERM_MS 150  // Maximum duration for a tap (ms)
+#endif
+
+#ifndef TRACKPAD_TAP_MOVE_THRESHOLD
+#    define TRACKPAD_TAP_MOVE_THRESHOLD 30  // Maximum movement during tap (in sensor units, ~1.5% of range)
+#endif
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
 
@@ -27,6 +49,138 @@ static void build_finger_bytes(uint8_t *buf, uint8_t contact_id, uint16_t x, uin
     buf[3] = (x >> 8) & 0xFF;    // X high byte
     buf[4] = y & 0xFF;           // Y low byte
     buf[5] = (y >> 8) & 0xFF;    // Y high byte
+}
+
+// Fallback mouse state
+static struct {
+    // Position tracking for relative movement
+    bool     tracking;
+    uint16_t last_x;
+    uint16_t last_y;
+    // Tap detection
+    bool     tap_pending;
+    uint32_t touch_start_time;
+    uint16_t touch_start_x;
+    uint16_t touch_start_y;
+    // Click state
+    bool     click_active;
+    uint32_t click_release_time;
+    // Previous state for change detection
+    uint8_t  prev_buttons;
+} mouse_state = {0};
+
+// Send fallback mouse report
+static void send_mouse_report(int8_t dx, int8_t dy, uint8_t buttons) {
+    report_trackpad_mouse_t report = {
+        .report_id = TRACKPAD_MOUSE_REPORT_ID,
+        .buttons   = buttons,
+        .x         = dx,
+        .y         = dy
+    };
+    // Use the same endpoint as PTP - different report ID distinguishes it
+    send_trackpad((report_digitizer_t *)&report);
+}
+
+// Clamp value to int8_t range
+static inline int8_t clamp_to_int8(int32_t value) {
+    if (value > 127) return 127;
+    if (value < -127) return -127;
+    return (int8_t)value;
+}
+
+// Minimum time to hold tap-click before releasing (ms)
+#ifndef TRACKPAD_TAP_CLICK_HOLD_MS
+#    define TRACKPAD_TAP_CLICK_HOLD_MS 20
+#endif
+
+// Process fallback mouse movement and tap-to-click
+static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_down, bool prev_finger_down) {
+    uint32_t now = timer_read32();
+    int8_t dx = 0;
+    int8_t dy = 0;
+    uint8_t buttons = 0;
+
+    // Handle physical button (from sensor)
+    if (sensor_report->buttons & 0x01) {
+        buttons |= 0x01;
+    }
+
+    // Handle finger down transition (start tracking)
+    if (finger_down && !prev_finger_down) {
+        mouse_state.tracking = true;
+        mouse_state.last_x = sensor_report->fingers[0].x;
+        mouse_state.last_y = sensor_report->fingers[0].y;
+        // Start tap detection
+        mouse_state.tap_pending = true;
+        mouse_state.touch_start_time = now;
+        mouse_state.touch_start_x = sensor_report->fingers[0].x;
+        mouse_state.touch_start_y = sensor_report->fingers[0].y;
+    }
+
+    // Handle finger movement (compute delta)
+    if (finger_down && mouse_state.tracking) {
+        int32_t raw_dx = (int32_t)sensor_report->fingers[0].x - (int32_t)mouse_state.last_x;
+        int32_t raw_dy = (int32_t)sensor_report->fingers[0].y - (int32_t)mouse_state.last_y;
+
+        // Check if movement exceeded tap threshold BEFORE applying sensitivity
+        // This uses distance from initial touch point
+        if (mouse_state.tap_pending) {
+            int32_t move_x = (int32_t)sensor_report->fingers[0].x - (int32_t)mouse_state.touch_start_x;
+            int32_t move_y = (int32_t)sensor_report->fingers[0].y - (int32_t)mouse_state.touch_start_y;
+            int32_t move_dist_sq = move_x * move_x + move_y * move_y;
+            if (move_dist_sq > TRACKPAD_TAP_MOVE_THRESHOLD * TRACKPAD_TAP_MOVE_THRESHOLD) {
+                mouse_state.tap_pending = false;
+            }
+            // Also invalidate if any single-frame movement is significant
+            if (raw_dx * raw_dx + raw_dy * raw_dy > 16) {  // ~4 units of movement in one frame
+                mouse_state.tap_pending = false;
+            }
+        }
+
+        // Apply sensitivity scaling
+        raw_dx = (int32_t)(raw_dx * TRACKPAD_MOUSE_SENSITIVITY);
+        raw_dy = (int32_t)(raw_dy * TRACKPAD_MOUSE_SENSITIVITY);
+
+        dx = clamp_to_int8(raw_dx);
+        dy = clamp_to_int8(raw_dy);
+
+        mouse_state.last_x = sensor_report->fingers[0].x;
+        mouse_state.last_y = sensor_report->fingers[0].y;
+    }
+
+    // Handle finger up transition (end tracking, check for tap)
+    if (!finger_down && prev_finger_down) {
+        mouse_state.tracking = false;
+
+        // Check if this was a tap
+        if (mouse_state.tap_pending) {
+            uint32_t touch_duration = timer_elapsed32(mouse_state.touch_start_time);
+            if (touch_duration <= TRACKPAD_TAP_TERM_MS) {
+                // Valid tap - generate click
+                mouse_state.click_active = true;
+                mouse_state.click_release_time = now;
+            }
+        }
+        mouse_state.tap_pending = false;
+    }
+
+    // Handle tap-generated click (button press then release after hold time)
+    if (mouse_state.click_active) {
+        buttons |= 0x01;
+        // Release after holding for TRACKPAD_TAP_CLICK_HOLD_MS
+        if (timer_elapsed32(mouse_state.click_release_time) >= TRACKPAD_TAP_CLICK_HOLD_MS) {
+            mouse_state.click_active = false;
+        }
+    }
+
+    // Only send report if there's actual movement or button state changed
+    bool buttons_changed = (buttons != mouse_state.prev_buttons);
+    bool has_movement = (dx != 0 || dy != 0);
+
+    if (has_movement || buttons_changed) {
+        send_mouse_report(dx, dy, buttons);
+        mouse_state.prev_buttons = buttons;
+    }
 }
 
 // PTP task function - synchronous polling with timer-based throttling
@@ -109,9 +263,19 @@ static bool navigator_trackpad_ptp_task(void) {
     // Byte 15: Contact count (bits 0-3) + buttons (bits 4-6)
     report[15] = (contact_count & 0x0F) | ((buttons & 0x01) << 4);
 
-    // Send report if any contacts (including lift-offs) or button changed
-    if (contact_count > 0 || button_changed) {
-        send_trackpad((report_digitizer_t *)report);
+    // Get current input mode
+    uint8_t input_mode = get_trackpad_input_mode();
+
+    // Send PTP report only in PTP mode (mode 3)
+    if (input_mode == TRACKPAD_INPUT_MODE_PTP) {
+        if (contact_count > 0 || button_changed) {
+            send_trackpad((report_digitizer_t *)report);
+        }
+    }
+
+    // Process fallback mouse only in mouse mode (mode 0)
+    if (input_mode == TRACKPAD_INPUT_MODE_MOUSE) {
+        process_fallback_mouse(&sensor_report, finger0_tip, prev_finger0_tip);
     }
 
     // Update previous state

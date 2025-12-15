@@ -590,6 +590,39 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
             HID_RI_POP(0),
         HID_RI_END_COLLECTION(0),
     HID_RI_END_COLLECTION(0),
+
+    // Fallback Mouse Collection - for systems that don't support PTP
+    // Uses report ID 0x06 to avoid conflicts with PTP reports (0x01-0x05)
+    HID_RI_USAGE_PAGE(8, 0x01),            // Generic Desktop
+    HID_RI_USAGE(8, 0x02),                 // Mouse
+    HID_RI_COLLECTION(8, 0x01),            // Application
+        HID_RI_REPORT_ID(8, 0x06),
+        HID_RI_USAGE(8, 0x01),             // Pointer
+        HID_RI_COLLECTION(8, 0x00),        // Physical
+            // Buttons (3 bits)
+            HID_RI_USAGE_PAGE(8, 0x09),    // Button
+            HID_RI_USAGE_MINIMUM(8, 0x01), // Button 1
+            HID_RI_USAGE_MAXIMUM(8, 0x03), // Button 3
+            HID_RI_LOGICAL_MINIMUM(8, 0x00),
+            HID_RI_LOGICAL_MAXIMUM(8, 0x01),
+            HID_RI_REPORT_COUNT(8, 0x03),
+            HID_RI_REPORT_SIZE(8, 0x01),
+            HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+            // Padding (5 bits)
+            HID_RI_REPORT_COUNT(8, 0x01),
+            HID_RI_REPORT_SIZE(8, 0x05),
+            HID_RI_INPUT(8, HID_IOF_CONSTANT),
+            // X/Y position (2 bytes, relative)
+            HID_RI_USAGE_PAGE(8, 0x01),    // Generic Desktop
+            HID_RI_USAGE(8, 0x30),         // X
+            HID_RI_USAGE(8, 0x31),         // Y
+            HID_RI_LOGICAL_MINIMUM(8, -127),
+            HID_RI_LOGICAL_MAXIMUM(8, 127),
+            HID_RI_REPORT_COUNT(8, 0x02),
+            HID_RI_REPORT_SIZE(8, 0x08),
+            HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_RELATIVE),
+        HID_RI_END_COLLECTION(0),
+    HID_RI_END_COLLECTION(0),
 };
 #endif
 

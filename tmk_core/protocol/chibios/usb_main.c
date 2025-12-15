@@ -58,6 +58,20 @@ extern keymap_config_t keymap_config;
 extern usb_endpoint_in_t  usb_endpoints_in[USB_ENDPOINT_IN_COUNT];
 extern usb_endpoint_out_t usb_endpoints_out[USB_ENDPOINT_OUT_COUNT];
 
+#ifdef PRECISION_TRACKPAD_ENABLE
+// Trackpad input mode: 0 = Mouse, 3 = PTP (Precision Touchpad)
+// Default to mouse mode for maximum compatibility
+static uint8_t trackpad_input_mode = 0;
+
+uint8_t get_trackpad_input_mode(void) {
+    return trackpad_input_mode;
+}
+
+void set_trackpad_input_mode(uint8_t mode) {
+    trackpad_input_mode = mode;
+}
+#endif
+
 static bool __attribute__((__unused__)) send_report_buffered(usb_endpoint_in_lut_t endpoint, void *report, size_t size);
 static void __attribute__((__unused__)) flush_report_buffered(usb_endpoint_in_lut_t endpoint, bool padded);
 static bool __attribute__((__unused__)) receive_report(usb_endpoint_out_lut_t endpoint, void *report, size_t size);
@@ -245,6 +259,19 @@ static void usb_event_cb(USBDriver *usbp, usbevent_t event) {
 
 static uint8_t _Alignas(4) set_report_buf[2];
 
+#ifdef PRECISION_TRACKPAD_ENABLE
+static void set_trackpad_transfer_cb(USBDriver *usbp) {
+    usb_control_request_t *setup = (usb_control_request_t *)usbp->setup;
+    uint8_t report_id = setup->wValue.lbyte;
+
+    // Report ID 0x04 is the Input Mode feature report
+    if (report_id == 0x04 && setup->wLength >= 2) {
+        // set_report_buf[0] = report_id, set_report_buf[1] = input mode
+        set_trackpad_input_mode(set_report_buf[1]);
+    }
+}
+#endif
+
 static void set_led_transfer_cb(USBDriver *usbp) {
     usb_control_request_t *setup = (usb_control_request_t *)usbp->setup;
 
@@ -315,8 +342,8 @@ static bool usb_requests_hook_cb(USBDriver *usbp) {
 #endif
 #ifdef PRECISION_TRACKPAD_ENABLE
                             case TRACKPAD_INTERFACE:
-                                // Accept SET_REPORT for PTP - Windows may send configuration
-                                usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), NULL);
+                                // Accept SET_REPORT for PTP - handle input mode switching
+                                usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), set_trackpad_transfer_cb);
                                 return true;
 #endif
                         }

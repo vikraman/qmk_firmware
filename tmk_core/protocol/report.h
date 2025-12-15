@@ -282,6 +282,19 @@ _Static_assert(sizeof(report_digitizer_t) == 16, "report_digitizer_t must be 16 
 // Legacy alias for compatibility
 typedef report_digitizer_t report_trackpad_t;
 
+// Trackpad fallback mouse report - for systems that don't support PTP
+// Report format: [report_id: 1 byte] [buttons: 1 byte] [x: 1 byte] [y: 1 byte]
+#define TRACKPAD_MOUSE_REPORT_ID 0x06
+
+typedef struct {
+    uint8_t report_id;
+    uint8_t buttons;
+    int8_t  x;
+    int8_t  y;
+} PACKED report_trackpad_mouse_t;
+
+_Static_assert(sizeof(report_trackpad_mouse_t) == 4, "report_trackpad_mouse_t must be 4 bytes");
+
 #if JOYSTICK_AXIS_RESOLUTION > 8
 typedef int16_t joystick_axis_t;
 #else

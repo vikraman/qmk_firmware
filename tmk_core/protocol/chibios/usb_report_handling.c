@@ -15,6 +15,10 @@
 extern usb_endpoint_in_t     usb_endpoints_in[USB_ENDPOINT_IN_COUNT];
 extern usb_endpoint_in_lut_t usb_endpoint_interface_lut[TOTAL_INTERFACES];
 
+#ifdef PRECISION_TRACKPAD_ENABLE
+extern uint8_t get_trackpad_input_mode(void);
+#endif
+
 void usb_set_report(usb_fs_report_t **reports, const uint8_t *data, size_t length) {
     if (*reports == NULL) {
         return;
@@ -101,9 +105,9 @@ bool usb_get_report_cb(USBDriver *driver) {
                 return true;
 
             case 0x04:  // Configuration - Input Mode
-                // Report input mode (3 = multi-touch)
+                // Report current input mode (0 = mouse, 3 = PTP)
                 feature_report[0] = 0x04;
-                feature_report[1] = 3;  // Multi-touch mode
+                feature_report[1] = get_trackpad_input_mode();
                 usbSetupTransfer(driver, feature_report, 2, NULL);
                 return true;
 

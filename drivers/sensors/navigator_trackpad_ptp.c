@@ -5,6 +5,7 @@
 // Converts Cirque Gen 6 sensor data to Windows Precision Touchpad HID reports
 // Also provides a fallback mouse collection for systems that don't support PTP
 
+#include <math.h>
 #include "navigator_trackpad_ptp.h"
 #include "navigator_trackpad_common.h"
 #include "precision_trackpad_drivers.h"
@@ -43,16 +44,19 @@ extern uint8_t get_trackpad_input_mode(void);
 
 // Tap-to-click configuration
 #ifndef TRACKPAD_TAP_TERM_MS
-#    define TRACKPAD_TAP_TERM_MS 150  // Maximum duration for a tap (ms)
+#    define TRACKPAD_TAP_TERM_MS 200  // Maximum duration for a tap (ms)
 #endif
 
-#ifndef TRACKPAD_TAP_MOVE_THRESHOLD
-#    define TRACKPAD_TAP_MOVE_THRESHOLD 30  // Maximum movement during tap (in sensor units, ~1.5% of range)
+#ifndef TRACKPAD_TAP_MOVE_THRESHOLD_SQ
+#    define TRACKPAD_TAP_MOVE_THRESHOLD_SQ 100  // Max movement squared before tap becomes drag
 #endif
 
-// Per-frame movement threshold squared for tap invalidation (~4 sensor units)
-#ifndef TRACKPAD_TAP_FRAME_MOVE_THRESHOLD_SQ
-#    define TRACKPAD_TAP_FRAME_MOVE_THRESHOLD_SQ 16
+#ifndef TRACKPAD_TAP_SETTLE_TIME_MS
+#    define TRACKPAD_TAP_SETTLE_TIME_MS 30  // Ignore movement during initial contact (ms)
+#endif
+
+#ifndef TRACKPAD_MAX_DELTA
+#    define TRACKPAD_MAX_DELTA 250  // Max allowed delta per frame to prevent jumps
 #endif
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
@@ -74,17 +78,20 @@ static struct {
     bool     tracking;
     uint16_t last_x;
     uint16_t last_y;
-    // Tap detection
-    bool     tap_pending;
+    // Tap detection - uses settled position like mouse mode
     uint32_t touch_start_time;
-    uint16_t touch_start_x;
-    uint16_t touch_start_y;
-    // Click state
-    bool     click_active;
-    uint32_t click_release_time;
+    uint16_t settled_x;
+    uint16_t settled_y;
+    bool     settled;
+    bool     is_drag;  // Set when movement exceeds tap threshold - enables cursor movement
+    // Click state - pending_release triggers button release on next cycle
+    bool     pending_release;
     // Previous state for change detection
     uint8_t  prev_buttons;
 } mouse_state = {0};
+
+// Track input mode to detect changes
+static uint8_t prev_input_mode = TRACKPAD_INPUT_MODE_PTP;
 
 // Send fallback mouse report
 static void send_mouse_report(int8_t dx, int8_t dy, uint8_t buttons) {
@@ -98,6 +105,20 @@ static void send_mouse_report(int8_t dx, int8_t dy, uint8_t buttons) {
     send_trackpad((report_digitizer_t *)&report);
 }
 
+// Reset mouse state when mode changes to avoid stale timers/state
+static void reset_mouse_state(void) {
+    // Send release if button was pressed
+    if (mouse_state.prev_buttons != 0 || mouse_state.pending_release) {
+        send_mouse_report(0, 0, 0);
+    }
+    mouse_state.tracking = false;
+    mouse_state.touch_start_time = 0;
+    mouse_state.settled = false;
+    mouse_state.is_drag = false;
+    mouse_state.pending_release = false;
+    mouse_state.prev_buttons = 0;
+}
+
 // Clamp value to int8_t range
 static inline int8_t clamp_to_int8(int32_t value) {
     if (value > 127) return 127;
@@ -105,17 +126,20 @@ static inline int8_t clamp_to_int8(int32_t value) {
     return (int8_t)value;
 }
 
-// Minimum time to hold tap-click before releasing (ms)
-#ifndef TRACKPAD_TAP_CLICK_HOLD_MS
-#    define TRACKPAD_TAP_CLICK_HOLD_MS 20
-#endif
-
 // Process fallback mouse movement and tap-to-click
+// Uses settle time and movement suppression like navigator_trackpad_mouse for smooth operation
 static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_down, bool prev_finger_down) {
-    uint32_t now = timer_read32();
     int8_t dx = 0;
     int8_t dy = 0;
     uint8_t buttons = 0;
+
+    // Handle pending click release from previous cycle (like mouse mode)
+    if (mouse_state.pending_release) {
+        mouse_state.pending_release = false;
+        send_mouse_report(0, 0, 0);
+        mouse_state.prev_buttons = 0;
+        // Continue processing - don't return early so we handle any new movement
+    }
 
     // Handle physical button (from sensor)
     if (sensor_report->buttons & BUTTON_PRIMARY) {
@@ -127,40 +151,61 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
         mouse_state.tracking = true;
         mouse_state.last_x = sensor_report->fingers[0].x;
         mouse_state.last_y = sensor_report->fingers[0].y;
-        // Start tap detection
-        mouse_state.tap_pending = true;
-        mouse_state.touch_start_time = now;
-        mouse_state.touch_start_x = sensor_report->fingers[0].x;
-        mouse_state.touch_start_y = sensor_report->fingers[0].y;
+        // Start tap detection with settle time approach
+        mouse_state.touch_start_time = timer_read32();
+        mouse_state.settled = false;
+        mouse_state.settled_x = 0;
+        mouse_state.settled_y = 0;
+        mouse_state.is_drag = false;
     }
 
-    // Handle finger movement (compute delta)
+    // Handle finger movement
     if (finger_down && mouse_state.tracking) {
-        int32_t raw_dx = (int32_t)sensor_report->fingers[0].x - (int32_t)mouse_state.last_x;
-        int32_t raw_dy = (int32_t)sensor_report->fingers[0].y - (int32_t)mouse_state.last_y;
+        uint32_t duration = timer_elapsed32(mouse_state.touch_start_time);
 
-        // Check if movement exceeded tap threshold BEFORE applying sensitivity
-        // This uses distance from initial touch point
-        if (mouse_state.tap_pending) {
-            int32_t move_x = (int32_t)sensor_report->fingers[0].x - (int32_t)mouse_state.touch_start_x;
-            int32_t move_y = (int32_t)sensor_report->fingers[0].y - (int32_t)mouse_state.touch_start_y;
-            int32_t move_dist_sq = move_x * move_x + move_y * move_y;
-            if (move_dist_sq > TRACKPAD_TAP_MOVE_THRESHOLD * TRACKPAD_TAP_MOVE_THRESHOLD) {
-                mouse_state.tap_pending = false;
-            }
-            // Also invalidate if any single-frame movement is significant
-            if (raw_dx * raw_dx + raw_dy * raw_dy > TRACKPAD_TAP_FRAME_MOVE_THRESHOLD_SQ) {
-                mouse_state.tap_pending = false;
+        // Record settled position once settle time elapses (for tap detection)
+        if (!mouse_state.settled && duration >= TRACKPAD_TAP_SETTLE_TIME_MS) {
+            mouse_state.settled = true;
+            mouse_state.settled_x = sensor_report->fingers[0].x;
+            mouse_state.settled_y = sensor_report->fingers[0].y;
+        }
+
+        // Check if movement from settled position exceeds tap threshold → becomes a drag
+        if (mouse_state.settled && !mouse_state.is_drag) {
+            int16_t move_x = (int16_t)sensor_report->fingers[0].x - (int16_t)mouse_state.settled_x;
+            int16_t move_y = (int16_t)sensor_report->fingers[0].y - (int16_t)mouse_state.settled_y;
+            int32_t dist_sq = (int32_t)move_x * move_x + (int32_t)move_y * move_y;
+            if (dist_sq > TRACKPAD_TAP_MOVE_THRESHOLD_SQ) {
+                mouse_state.is_drag = true;
             }
         }
 
-        // Apply sensitivity scaling
-        raw_dx = (int32_t)(raw_dx * TRACKPAD_MOUSE_SENSITIVITY);
-        raw_dy = (int32_t)(raw_dy * TRACKPAD_MOUSE_SENSITIVITY);
+        // Only report movement once we've determined this is a drag (not a tap)
+        if (mouse_state.is_drag) {
+            int16_t raw_dx = (int16_t)sensor_report->fingers[0].x - (int16_t)mouse_state.last_x;
+            int16_t raw_dy = (int16_t)sensor_report->fingers[0].y - (int16_t)mouse_state.last_y;
 
-        dx = clamp_to_int8(raw_dx);
-        dy = clamp_to_int8(raw_dy);
+            // Clamp deltas to prevent jumps from bad sensor data
+            if (raw_dx > TRACKPAD_MAX_DELTA) raw_dx = TRACKPAD_MAX_DELTA;
+            if (raw_dx < -TRACKPAD_MAX_DELTA) raw_dx = -TRACKPAD_MAX_DELTA;
+            if (raw_dy > TRACKPAD_MAX_DELTA) raw_dy = TRACKPAD_MAX_DELTA;
+            if (raw_dy < -TRACKPAD_MAX_DELTA) raw_dy = -TRACKPAD_MAX_DELTA;
 
+            if (raw_dx != 0 || raw_dy != 0) {
+                // Apply exponential acceleration for smooth cursor feel (like mouse mode)
+                float acc_dx = (raw_dx < 0) ? -powf(-raw_dx, 1.2f) : powf(raw_dx, 1.2f);
+                float acc_dy = (raw_dy < 0) ? -powf(-raw_dy, 1.2f) : powf(raw_dy, 1.2f);
+
+                // Apply sensitivity scaling
+                acc_dx *= TRACKPAD_MOUSE_SENSITIVITY;
+                acc_dy *= TRACKPAD_MOUSE_SENSITIVITY;
+
+                dx = clamp_to_int8((int32_t)acc_dx);
+                dy = clamp_to_int8((int32_t)acc_dy);
+            }
+        }
+
+        // Always update last position for delta calculation
         mouse_state.last_x = sensor_report->fingers[0].x;
         mouse_state.last_y = sensor_report->fingers[0].y;
     }
@@ -169,25 +214,19 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
     if (!finger_down && prev_finger_down) {
         mouse_state.tracking = false;
 
-        // Check if this was a tap
-        if (mouse_state.tap_pending) {
-            uint32_t touch_duration = timer_elapsed32(mouse_state.touch_start_time);
-            if (touch_duration <= TRACKPAD_TAP_TERM_MS) {
-                // Valid tap - generate click
-                mouse_state.click_active = true;
-                mouse_state.click_release_time = now;
-            }
-        }
-        mouse_state.tap_pending = false;
-    }
+        uint32_t touch_duration = timer_elapsed32(mouse_state.touch_start_time);
 
-    // Handle tap-generated click (button press then release after hold time)
-    if (mouse_state.click_active) {
-        buttons |= BUTTON_PRIMARY;
-        // Release after holding for TRACKPAD_TAP_CLICK_HOLD_MS
-        if (timer_elapsed32(mouse_state.click_release_time) >= TRACKPAD_TAP_CLICK_HOLD_MS) {
-            mouse_state.click_active = false;
+        // Tap conditions: not a drag AND short duration
+        bool is_tap = !mouse_state.is_drag && (touch_duration <= TRACKPAD_TAP_TERM_MS);
+
+        if (is_tap) {
+            // Valid tap - send click press, release will happen next cycle
+            send_mouse_report(0, 0, BUTTON_PRIMARY);
+            mouse_state.prev_buttons = BUTTON_PRIMARY;
+            mouse_state.pending_release = true;
         }
+
+        mouse_state.settled = false;
     }
 
     // Only send report if there's actual movement or button state changed
@@ -292,8 +331,13 @@ static bool navigator_trackpad_ptp_task(void) {
     // Contact count (bits 0-3) + buttons (bits 4-6)
     report[PTP_COUNT_BUTTONS_OFFSET] = (contact_count & 0x0F) | ((buttons & BUTTON_PRIMARY) << 4);
 
-    // Get current input mode
+    // Get current input mode and handle mode changes
     uint8_t input_mode = get_trackpad_input_mode();
+    if (input_mode != prev_input_mode) {
+        // Mode changed - reset mouse state to avoid stale timers/state
+        reset_mouse_state();
+        prev_input_mode = input_mode;
+    }
 
     // Send PTP report only in PTP mode (mode 3)
     if (input_mode == TRACKPAD_INPUT_MODE_PTP) {

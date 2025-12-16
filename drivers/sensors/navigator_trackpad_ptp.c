@@ -37,11 +37,6 @@ extern uint8_t get_trackpad_input_mode(void);
 // Button masks
 #define BUTTON_PRIMARY          0x01
 
-// Fallback mouse configuration
-#ifndef TRACKPAD_MOUSE_SENSITIVITY
-#    define TRACKPAD_MOUSE_SENSITIVITY 1.0f
-#endif
-
 // Tap-to-click configuration
 #ifndef TRACKPAD_TAP_TERM_MS
 #    define TRACKPAD_TAP_TERM_MS 200  // Maximum duration for a tap (ms)
@@ -78,6 +73,9 @@ static struct {
     bool     tracking;
     uint16_t last_x;
     uint16_t last_y;
+    // Subpixel accumulation for smooth low-sensitivity movement
+    float    dx_accum;
+    float    dy_accum;
     // Tap detection - uses settled position like mouse mode
     uint32_t touch_start_time;
     uint16_t settled_x;
@@ -112,6 +110,8 @@ static void reset_mouse_state(void) {
         send_mouse_report(0, 0, 0);
     }
     mouse_state.tracking = false;
+    mouse_state.dx_accum = 0.0f;
+    mouse_state.dy_accum = 0.0f;
     mouse_state.touch_start_time = 0;
     mouse_state.settled = false;
     mouse_state.is_drag = false;
@@ -151,6 +151,9 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
         mouse_state.tracking = true;
         mouse_state.last_x = sensor_report->fingers[0].x;
         mouse_state.last_y = sensor_report->fingers[0].y;
+        // Reset subpixel accumulators for new touch
+        mouse_state.dx_accum = 0.0f;
+        mouse_state.dy_accum = 0.0f;
         // Start tap detection with settle time approach
         mouse_state.touch_start_time = timer_read32();
         mouse_state.settled = false;
@@ -192,16 +195,19 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
             if (raw_dy < -TRACKPAD_MAX_DELTA) raw_dy = -TRACKPAD_MAX_DELTA;
 
             if (raw_dx != 0 || raw_dy != 0) {
-                // Apply exponential acceleration for smooth cursor feel (like mouse mode)
-                float acc_dx = (raw_dx < 0) ? -powf(-raw_dx, 1.2f) : powf(raw_dx, 1.2f);
-                float acc_dy = (raw_dy < 0) ? -powf(-raw_dy, 1.2f) : powf(raw_dy, 1.2f);
+                // Apply configurable acceleration for cursor feel
+                float acc_dx = (raw_dx < 0) ? -powf(-raw_dx, TRACKPAD_MOUSE_ACCELERATION) : powf(raw_dx, TRACKPAD_MOUSE_ACCELERATION);
+                float acc_dy = (raw_dy < 0) ? -powf(-raw_dy, TRACKPAD_MOUSE_ACCELERATION) : powf(raw_dy, TRACKPAD_MOUSE_ACCELERATION);
 
-                // Apply sensitivity scaling
-                acc_dx *= TRACKPAD_MOUSE_SENSITIVITY;
-                acc_dy *= TRACKPAD_MOUSE_SENSITIVITY;
+                // Apply sensitivity scaling and accumulate for subpixel precision
+                mouse_state.dx_accum += acc_dx * TRACKPAD_MOUSE_SENSITIVITY;
+                mouse_state.dy_accum += acc_dy * TRACKPAD_MOUSE_SENSITIVITY;
 
-                dx = clamp_to_int8((int32_t)acc_dx);
-                dy = clamp_to_int8((int32_t)acc_dy);
+                // Extract integer portion for reporting, keep fractional for next frame
+                dx = clamp_to_int8((int32_t)mouse_state.dx_accum);
+                dy = clamp_to_int8((int32_t)mouse_state.dy_accum);
+                mouse_state.dx_accum -= dx;
+                mouse_state.dy_accum -= dy;
             }
         }
 

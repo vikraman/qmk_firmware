@@ -183,6 +183,21 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
     }
 }
 
+// Sensor coordinate range (measured empirically)
+#define SENSOR_X_MIN 281
+#define SENSOR_X_MAX 2018
+#define SENSOR_Y_MIN 276
+#define SENSOR_Y_MAX 2018
+
+// Scale sensor coordinates to logical range (0 - TRACKPAD_LOGICAL_MAX)
+static uint16_t scale_coordinate(uint16_t raw, uint16_t sensor_min, uint16_t sensor_max) {
+    // Clamp to sensor range
+    if (raw < sensor_min) raw = sensor_min;
+    if (raw > sensor_max) raw = sensor_max;
+    // Scale to logical range
+    return (uint32_t)(raw - sensor_min) * TRACKPAD_LOGICAL_MAX / (sensor_max - sensor_min);
+}
+
 // PTP task function - synchronous polling with timer-based throttling
 static bool navigator_trackpad_ptp_task(void) {
     static uint32_t last_poll_time  = 0;
@@ -241,8 +256,8 @@ static bool navigator_trackpad_ptp_task(void) {
     // Bytes 1-6: Finger 0 (include if touching or lifting off)
     if (finger0_contact) {
         build_finger_bytes(&report[1], 0,
-                           sensor_report.fingers[0].x,
-                           sensor_report.fingers[0].y,
+                           scale_coordinate(sensor_report.fingers[0].x, SENSOR_X_MIN, SENSOR_X_MAX),
+                           scale_coordinate(sensor_report.fingers[0].y, SENSOR_Y_MIN, SENSOR_Y_MAX),
                            finger0_tip,
                            sensor_report.fingers[0].confidence);
     }
@@ -250,8 +265,8 @@ static bool navigator_trackpad_ptp_task(void) {
     // Bytes 7-12: Finger 1 (include if touching or lifting off)
     if (finger1_contact) {
         build_finger_bytes(&report[7], 1,
-                           sensor_report.fingers[1].x,
-                           sensor_report.fingers[1].y,
+                           scale_coordinate(sensor_report.fingers[1].x, SENSOR_X_MIN, SENSOR_X_MAX),
+                           scale_coordinate(sensor_report.fingers[1].y, SENSOR_Y_MIN, SENSOR_Y_MAX),
                            finger1_tip,
                            sensor_report.fingers[1].confidence);
     }

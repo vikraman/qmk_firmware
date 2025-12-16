@@ -70,9 +70,21 @@
 #    define TRACKPAD_PHYSICAL_HEIGHT 157 * TRACkbPAD_DIMENSIONS_FACTOR  // 1.57 inches (40mm actual size)
 #endif
 
-// Logical coordinate range from Cirque Gen6 sensor in PTP mode (raw, no scaling)
-// Actual usable range is approximately 280-2018, rounded to 2048
+// Logical coordinate range for HID descriptor (what we report to the OS)
 #define TRACKPAD_LOGICAL_MAX 2048
+
+// Sensor coordinate range (measured empirically from Cirque Gen6)
+// These define the actual usable touch area of the sensor
+#define SENSOR_X_MIN 281
+#define SENSOR_X_MAX 2018
+#define SENSOR_Y_MIN 276
+#define SENSOR_Y_MAX 2018
+
+// Fixed-point multipliers for coordinate scaling (Q16 format)
+// Precomputed as: (TRACKPAD_LOGICAL_MAX << 16) / (SENSOR_MAX - SENSOR_MIN)
+// This avoids expensive division at runtime
+#define SENSOR_SCALE_X_MULT 77176  // 2048 * 65536 / (2018 - 281)
+#define SENSOR_SCALE_Y_MULT 76957  // 2048 * 65536 / (2018 - 276)
 
 // Common finger structure (used by both mouse and PTP modes)
 typedef struct {

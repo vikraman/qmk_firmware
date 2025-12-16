@@ -21,8 +21,20 @@ extern void send_trackpad(report_digitizer_t *report);
 // Defined in usb_main.c
 extern uint8_t get_trackpad_input_mode(void);
 
+// Input mode values (set by host via HID feature report)
 #define TRACKPAD_INPUT_MODE_MOUSE 0
 #define TRACKPAD_INPUT_MODE_PTP   3
+
+// PTP report structure constants
+#define PTP_REPORT_ID           0x01
+#define PTP_REPORT_SIZE         16
+#define PTP_FINGER0_OFFSET      1
+#define PTP_FINGER1_OFFSET      7
+#define PTP_SCAN_TIME_OFFSET    13
+#define PTP_COUNT_BUTTONS_OFFSET 15
+
+// Button masks
+#define BUTTON_PRIMARY          0x01
 
 // Fallback mouse configuration
 #ifndef TRACKPAD_MOUSE_SENSITIVITY
@@ -36,6 +48,11 @@ extern uint8_t get_trackpad_input_mode(void);
 
 #ifndef TRACKPAD_TAP_MOVE_THRESHOLD
 #    define TRACKPAD_TAP_MOVE_THRESHOLD 30  // Maximum movement during tap (in sensor units, ~1.5% of range)
+#endif
+
+// Per-frame movement threshold squared for tap invalidation (~4 sensor units)
+#ifndef TRACKPAD_TAP_FRAME_MOVE_THRESHOLD_SQ
+#    define TRACKPAD_TAP_FRAME_MOVE_THRESHOLD_SQ 16
 #endif
 
 #if defined(NAVIGATOR_TRACKPAD_PTP_MODE)
@@ -101,8 +118,8 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
     uint8_t buttons = 0;
 
     // Handle physical button (from sensor)
-    if (sensor_report->buttons & 0x01) {
-        buttons |= 0x01;
+    if (sensor_report->buttons & BUTTON_PRIMARY) {
+        buttons |= BUTTON_PRIMARY;
     }
 
     // Handle finger down transition (start tracking)
@@ -132,7 +149,7 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
                 mouse_state.tap_pending = false;
             }
             // Also invalidate if any single-frame movement is significant
-            if (raw_dx * raw_dx + raw_dy * raw_dy > 16) {  // ~4 units of movement in one frame
+            if (raw_dx * raw_dx + raw_dy * raw_dy > TRACKPAD_TAP_FRAME_MOVE_THRESHOLD_SQ) {
                 mouse_state.tap_pending = false;
             }
         }
@@ -166,7 +183,7 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
 
     // Handle tap-generated click (button press then release after hold time)
     if (mouse_state.click_active) {
-        buttons |= 0x01;
+        buttons |= BUTTON_PRIMARY;
         // Release after holding for TRACKPAD_TAP_CLICK_HOLD_MS
         if (timer_elapsed32(mouse_state.click_release_time) >= TRACKPAD_TAP_CLICK_HOLD_MS) {
             mouse_state.click_active = false;
@@ -183,19 +200,18 @@ static void process_fallback_mouse(cgen6_report_t *sensor_report, bool finger_do
     }
 }
 
-// Sensor coordinate range (measured empirically)
-#define SENSOR_X_MIN 281
-#define SENSOR_X_MAX 2018
-#define SENSOR_Y_MIN 276
-#define SENSOR_Y_MAX 2018
+// Scale sensor X coordinate to logical range using fixed-point multiplication
+static inline uint16_t scale_x(uint16_t raw) {
+    if (raw < SENSOR_X_MIN) raw = SENSOR_X_MIN;
+    if (raw > SENSOR_X_MAX) raw = SENSOR_X_MAX;
+    return ((uint32_t)(raw - SENSOR_X_MIN) * SENSOR_SCALE_X_MULT) >> 16;
+}
 
-// Scale sensor coordinates to logical range (0 - TRACKPAD_LOGICAL_MAX)
-static uint16_t scale_coordinate(uint16_t raw, uint16_t sensor_min, uint16_t sensor_max) {
-    // Clamp to sensor range
-    if (raw < sensor_min) raw = sensor_min;
-    if (raw > sensor_max) raw = sensor_max;
-    // Scale to logical range
-    return (uint32_t)(raw - sensor_min) * TRACKPAD_LOGICAL_MAX / (sensor_max - sensor_min);
+// Scale sensor Y coordinate to logical range using fixed-point multiplication
+static inline uint16_t scale_y(uint16_t raw) {
+    if (raw < SENSOR_Y_MIN) raw = SENSOR_Y_MIN;
+    if (raw > SENSOR_Y_MAX) raw = SENSOR_Y_MAX;
+    return ((uint32_t)(raw - SENSOR_Y_MIN) * SENSOR_SCALE_Y_MULT) >> 16;
 }
 
 // PTP task function - synchronous polling with timer-based throttling
@@ -240,43 +256,41 @@ static bool navigator_trackpad_ptp_task(void) {
     bool finger0_contact = finger0_tip || prev_finger0_tip;
     bool finger1_contact = finger1_tip || prev_finger1_tip;
 
-    uint8_t buttons = sensor_report.buttons & 0x01;
+    uint8_t buttons = sensor_report.buttons & BUTTON_PRIMARY;
     bool button_changed = (buttons != prev_buttons);
 
     // Contact count includes fingers that are touching OR lifting off this frame
     uint8_t contact_count = (finger0_contact ? 1 : 0) + (finger1_contact ? 1 : 0);
 
     // Build report from sensor data using explicit byte manipulation
-    // Report format (16 bytes): [report_id] [finger0: 6 bytes] [finger1: 6 bytes] [scan_time: 2 bytes] [count+buttons: 1 byte]
-    uint8_t report[16] = {0};
+    uint8_t report[PTP_REPORT_SIZE] = {0};
 
-    // Byte 0: Report ID
-    report[0] = 0x01;
+    report[0] = PTP_REPORT_ID;
 
-    // Bytes 1-6: Finger 0 (include if touching or lifting off)
+    // Finger 0 (include if touching or lifting off)
     if (finger0_contact) {
-        build_finger_bytes(&report[1], 0,
-                           scale_coordinate(sensor_report.fingers[0].x, SENSOR_X_MIN, SENSOR_X_MAX),
-                           scale_coordinate(sensor_report.fingers[0].y, SENSOR_Y_MIN, SENSOR_Y_MAX),
+        build_finger_bytes(&report[PTP_FINGER0_OFFSET], 0,
+                           scale_x(sensor_report.fingers[0].x),
+                           scale_y(sensor_report.fingers[0].y),
                            finger0_tip,
                            sensor_report.fingers[0].confidence);
     }
 
-    // Bytes 7-12: Finger 1 (include if touching or lifting off)
+    // Finger 1 (include if touching or lifting off)
     if (finger1_contact) {
-        build_finger_bytes(&report[7], 1,
-                           scale_coordinate(sensor_report.fingers[1].x, SENSOR_X_MIN, SENSOR_X_MAX),
-                           scale_coordinate(sensor_report.fingers[1].y, SENSOR_Y_MIN, SENSOR_Y_MAX),
+        build_finger_bytes(&report[PTP_FINGER1_OFFSET], 1,
+                           scale_x(sensor_report.fingers[1].x),
+                           scale_y(sensor_report.fingers[1].y),
                            finger1_tip,
                            sensor_report.fingers[1].confidence);
     }
 
-    // Bytes 13-14: Scan time
-    report[13] = sensor_report.scan_time & 0xFF;
-    report[14] = (sensor_report.scan_time >> 8) & 0xFF;
+    // Scan time (2 bytes, little-endian)
+    report[PTP_SCAN_TIME_OFFSET]     = sensor_report.scan_time & 0xFF;
+    report[PTP_SCAN_TIME_OFFSET + 1] = (sensor_report.scan_time >> 8) & 0xFF;
 
-    // Byte 15: Contact count (bits 0-3) + buttons (bits 4-6)
-    report[15] = (contact_count & 0x0F) | ((buttons & 0x01) << 4);
+    // Contact count (bits 0-3) + buttons (bits 4-6)
+    report[PTP_COUNT_BUTTONS_OFFSET] = (contact_count & 0x0F) | ((buttons & BUTTON_PRIMARY) << 4);
 
     // Get current input mode
     uint8_t input_mode = get_trackpad_input_mode();

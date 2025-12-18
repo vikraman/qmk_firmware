@@ -267,12 +267,6 @@ static bool navigator_trackpad_ptp_task(void) {
     // Track previous finger state to detect lift-offs
     static bool     prev_finger0_tip = false;
     static bool     prev_finger1_tip = false;
-    // Cache last known good position for each finger (used during lift-off)
-    // This prevents garbage sensor data from creating phantom fingers
-    static uint16_t last_finger0_x = 0;
-    static uint16_t last_finger0_y = 0;
-    static uint16_t last_finger1_x = 0;
-    static uint16_t last_finger1_y = 0;
 
     uint32_t now = timer_read32();
 
@@ -320,37 +314,20 @@ static bool navigator_trackpad_ptp_task(void) {
 
     // Finger 0 (include if touching or lifting off)
     if (finger0_contact) {
-        // Use current sensor position if touching, cached position for lift-off
-        // This prevents garbage sensor data from creating phantom fingers
-        uint16_t x0 = finger0_tip ? sensor_report.fingers[0].x : last_finger0_x;
-        uint16_t y0 = finger0_tip ? sensor_report.fingers[0].y : last_finger0_y;
         build_finger_bytes(&report[PTP_FINGER0_OFFSET], 0,
-                           scale_x(x0),
-                           scale_y(y0),
+                           scale_x(sensor_report.fingers[0].x),
+                           scale_y(sensor_report.fingers[0].y),
                            finger0_tip,
-                           finger0_tip ? sensor_report.fingers[0].confidence : false);
+                           sensor_report.fingers[0].confidence);
     }
 
     // Finger 1 (include if touching or lifting off)
     if (finger1_contact) {
-        // Use current sensor position if touching, cached position for lift-off
-        uint16_t x1 = finger1_tip ? sensor_report.fingers[1].x : last_finger1_x;
-        uint16_t y1 = finger1_tip ? sensor_report.fingers[1].y : last_finger1_y;
         build_finger_bytes(&report[PTP_FINGER1_OFFSET], 1,
-                           scale_x(x1),
-                           scale_y(y1),
+                           scale_x(sensor_report.fingers[1].x),
+                           scale_y(sensor_report.fingers[1].y),
                            finger1_tip,
-                           finger1_tip ? sensor_report.fingers[1].confidence : false);
-    }
-
-    // Update cached positions when fingers are actively touching
-    if (finger0_tip) {
-        last_finger0_x = sensor_report.fingers[0].x;
-        last_finger0_y = sensor_report.fingers[0].y;
-    }
-    if (finger1_tip) {
-        last_finger1_x = sensor_report.fingers[1].x;
-        last_finger1_y = sensor_report.fingers[1].y;
+                           sensor_report.fingers[1].confidence);
     }
 
     // Scan time (2 bytes, little-endian)

@@ -296,6 +296,21 @@ static bool navigator_trackpad_ptp_task(void) {
     bool finger0_tip = sensor_report.fingers[0].tip && sensor_report.fingers[0].confidence;
     bool finger1_tip = sensor_report.fingers[1].tip && sensor_report.fingers[1].confidence;
 
+    // Use sensor's contact_count to detect ghost fingers
+    // Only suppress finger 1 if:
+    // - contact_count says 0 or 1 finger, AND
+    // - finger 1 was already touching last frame (not a new touch)
+    // This prevents ghost fingers while allowing two-finger taps to register
+    uint8_t sensor_contact_count = sensor_report.contact_count;
+    if (sensor_contact_count == 0) {
+        finger0_tip = false;
+        finger1_tip = false;
+    } else if (sensor_contact_count == 1 && prev_finger1_tip) {
+        // Finger 1 was touching last frame but contact_count is now 1
+        // This indicates finger 1 lifted - suppress any stale slot data
+        finger1_tip = false;
+    }
+
     // Determine if each finger should be included in contact_count
     // Include finger if: currently touching OR was touching last frame (lift-off)
     bool finger0_contact = finger0_tip || prev_finger0_tip;

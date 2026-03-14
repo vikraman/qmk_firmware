@@ -1,15 +1,39 @@
 // Alternate reference layers by layer
-//               Layer    Reference layer
-COMBO_REF_LAYER(_COLEMAK, _QWERTY)
+//               Layer       Reference layer
+COMBO_REF_LAYER(_GRAPHITE,  _QWERTY)
 
-//   name        result                         chord keys
-COMB(QW_UNDO,   C(KC_Z),                        KC_Q, KC_W)
-COMB(WE_SEL,    SELWORD,                        KC_W, KC_E)
-SUBS(EM_EMAIL,  "vikraman.choudhury@gmail.com", KC_E, KC_M)
+//   name        result     chord keys
+COMB(QW_UNDO,   C(KC_Z),    KC_Q, KC_W)
+COMB(WE_SEL,    SELWORD,    KC_W, KC_E)
 
-COMB(OP_BSLS,   KC_BSLS,                        KC_O, KC_P)
-COMB(MCOM_UNDS, KC_UNDS,                        KC_M, KC_COMM)
-COMB(XC_MINS,   KC_MINS,                        KC_X, KC_C)
+SUBS(EM_EMAIL, "vikraman.choudhury@gmail.com", KC_E, KC_M)
 
-COMB(JK_TAB,   KC_TAB,                          RSFT_T(KC_J), RGUI_T(KC_K))
-COMB(JKL_SPC,  KC_SPC,                          RSFT_T(KC_J), RGUI_T(KC_K), LALT_T(KC_L))
+COMB(OP_BSLS,   KC_BSLS,    KC_O, KC_P)
+COMB(MCOM_UNDS, KC_UNDS,    RS_M, KC_COMM)
+COMB(XC_MINS,   KC_MINS,    KC_X, KC_C)
+
+COMB(JK_TAB,   KC_TAB,      RG_J, RA_K)
+COMB(JKL_SPC,  KC_SPC,      RG_J, RA_K, RC_L)
+
+// Media and extended key combos
+COMB(ZX_INS,   KC_INS,      KC_Z, KC_X)
+COMB(KL_MUTE,  KC_MUTE,     RA_K, RC_L)
+COMB(SC_PLAY,  KC_MPLY,     KC_SCLN, RCTL_T(KC_QUOT))
+
+COMB(CM_MOUSE, MOUSE_L,     KC_SCLN, KC_SLSH)
+
+COMB(WM_1, C(A(KC_1)),      CS_SPC, KC_Q)
+COMB(WM_2, C(A(KC_2)),      CS_SPC, KC_W)
+COMB(WM_3, C(A(KC_3)),      CS_SPC, KC_E)
+COMB(WM_4, C(A(KC_4)),      CS_SPC, KC_R)
+COMB(WM_5, C(A(KC_5)),      CS_SPC, KC_T)
+COMB(CM_1, KC_1,            CS_SPC, KC_A)
+COMB(CM_2, KC_2,            CS_SPC, LC_S)
+COMB(CM_3, KC_3,            CS_SPC, LA_D)
+COMB(CM_4, KC_4,            CS_SPC, LG_F)
+COMB(CM_5, KC_5,            CS_SPC, KC_G)
+COMB(CM_6, KC_6,            CS_SPC, KC_Z)
+COMB(CM_7, KC_7,            CS_SPC, KC_X)
+COMB(CM_8, KC_8,            CS_SPC, KC_C)
+COMB(CM_9, KC_9,            CS_SPC, LS_V)
+COMB(CM_0, KC_0,            CS_SPC, KC_B)

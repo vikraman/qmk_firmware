@@ -296,7 +296,7 @@ bool process_magic(uint16_t keycode, keyrecord_t *record) {
             } else if (record->event.pressed) {
                 return true;
             }
-            return false;
+            return true;
         case CS_RT1:
             if (record->event.pressed && record->tap.count) {
                 dprintf("repeat tap ignored");
@@ -304,7 +304,7 @@ bool process_magic(uint16_t keycode, keyrecord_t *record) {
             } else if (record->event.pressed) {
                 return true;
             }
-            return false;
+            return true;
     }
     return true;
 }

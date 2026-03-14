@@ -30,13 +30,13 @@ enum { RGB_LAYER_CONFIG(RGB_LAYER_ENUM) };
 #undef RGB_LAYER_ENUM
 
 enum {
-    RGB_INDICATOR_START    = 0,
-    RGB_INDICATOR_COUNT    = RGBLIGHT_LED_COUNT,
-    RGB_SWITCH_BLINK_MS    = 120,
-    RGB_SWITCH_BLINK_TIMES = 3,
-    RGB_DEFAULT_VAL_25PCT  = 64,
+    RGB_INDICATOR_START    = (RGBLIGHT_LED_COUNT / 2) - 2,
+    RGB_INDICATOR_COUNT    = 4,
+    RGB_SWITCH_BLINK_MS    = 80,
+    RGB_SWITCH_BLINK_TIMES = 5,
+    RGB_DEFAULT_BRIGHTNESS = 64,
     BOOT_BLINK_MS          = 80,
-    BOOT_BLINK_TIMES       = 3,
+    BOOT_BLINK_TIMES       = 5,
 };
 
 static uint8_t  restore_layer   = RGBLIGHT_MAX_LAYERS;
@@ -84,7 +84,7 @@ static void set_default_animation(layer_state_t default_state) {
     rgblight_mode_noeeprom(mode);
 
     // Keep brightness fixed at 25% regardless of EEPROM-stored value.
-    rgblight_sethsv_noeeprom(rgblight_get_hue(), rgblight_get_sat(), RGB_DEFAULT_VAL_25PCT);
+    rgblight_sethsv_noeeprom(rgblight_get_hue(), rgblight_get_sat(), RGB_DEFAULT_BRIGHTNESS);
 }
 
 static uint8_t get_active_indicator_layer(layer_state_t state) {
@@ -110,7 +110,6 @@ void keyboard_post_init_user(void) {
 }
 
 layer_state_t default_layer_state_set_user(layer_state_t state) {
-    set_default_animation(state);
     return state;
 }
 
@@ -145,7 +144,7 @@ void housekeeping_task_user(void) {
         if (restore_layer < RGBLIGHT_MAX_LAYERS) {
             rgblight_set_layer_state(restore_layer, true);
         }
-        rgblight_sethsv_noeeprom(rgblight_get_hue(), rgblight_get_sat(), RGB_DEFAULT_VAL_25PCT);
+        rgblight_sethsv_noeeprom(rgblight_get_hue(), rgblight_get_sat(), RGB_DEFAULT_BRIGHTNESS);
         restore_pending = false;
     }
 }

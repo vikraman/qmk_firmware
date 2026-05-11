@@ -90,7 +90,7 @@ void host_digitizer_send(digitizer_t *digitizer);
  * A touchpad driver module overrides this with a strong implementation
  * to initialize sensor hardware. Default is a no-op.
  */
-__attribute__((weak)) void digitizer_touchpad_init(void);
+void digitizer_touchpad_init(void);
 
 /**
  * \brief Weak hook called from keyboard_task() each iteration.
@@ -99,7 +99,7 @@ __attribute__((weak)) void digitizer_touchpad_init(void);
  * USB reports. Return true if any report was sent (drives the activity
  * tracker). Default is a no-op returning false.
  */
-__attribute__((weak)) bool digitizer_touchpad_task(void);
+bool digitizer_touchpad_task(void);
 
 /**
  * \brief Current host-selected input mode.

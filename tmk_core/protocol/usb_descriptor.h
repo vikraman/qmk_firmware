@@ -145,12 +145,6 @@ typedef struct {
     USB_Descriptor_Endpoint_t  Digitizer_INEndpoint;
 #endif
 
-#if defined(PRECISION_TRACKPAD_ENABLE)
-    // Precision Trackpad HID Interface
-    USB_Descriptor_Interface_t Trackpad_Interface;
-    USB_HID_Descriptor_HID_t   Trackpad_HID;
-    USB_Descriptor_Endpoint_t  Trackpad_INEndpoint;
-#endif
 } USB_Descriptor_Configuration_t;
 
 /*
@@ -201,9 +195,6 @@ enum usb_interfaces {
     DIGITIZER_INTERFACE,
 #endif
 
-#if defined(PRECISION_TRACKPAD_ENABLE)
-    TRACKPAD_INTERFACE,
-#endif
     TOTAL_INTERFACES
 };
 
@@ -281,9 +272,6 @@ enum usb_endpoints {
 #    endif
 #endif
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-    TRACKPAD_IN_EPNUM = NEXT_EPNUM,
-#endif
 };
 
 #ifdef PROTOCOL_LUFA
@@ -307,7 +295,10 @@ enum usb_endpoints {
 #define CDC_NOTIFICATION_EPSIZE 8
 #define CDC_EPSIZE 16
 #define JOYSTICK_EPSIZE 8
-#define DIGITIZER_EPSIZE 8
-#define TRACKPAD_EPSIZE 64
+#ifdef DIGITIZER_MODE_TOUCHPAD
+#    define DIGITIZER_EPSIZE 64
+#else
+#    define DIGITIZER_EPSIZE 8
+#endif
 
 uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const uint16_t wLength, const void** const DescriptorAddress);

@@ -15,12 +15,13 @@
 
 #ifdef PRECISION_TRACKPAD_ENABLE
 
-// External declaration for report sending (used for both PTP and mouse reports)
-extern void send_trackpad(report_digitizer_t *report);
+// External declarations for report sending (defined in usb_main.c)
+extern void send_digitizer_touchpad(report_digitizer_touchpad_t *report);
+extern void send_digitizer_touchpad_mouse(report_digitizer_touchpad_mouse_t *report);
 
 // Input mode: 0 = Mouse, 3 = PTP
 // Defined in usb_main.c
-extern uint8_t get_trackpad_input_mode(void);
+extern uint8_t digitizer_touchpad_get_input_mode(void);
 
 // Input mode values (set by host via HID feature report)
 #define TRACKPAD_INPUT_MODE_MOUSE 0
@@ -93,14 +94,13 @@ static uint8_t prev_input_mode = TRACKPAD_INPUT_MODE_PTP;
 
 // Send fallback mouse report
 static void send_mouse_report(int8_t dx, int8_t dy, uint8_t buttons) {
-    report_trackpad_mouse_t report = {
+    report_digitizer_touchpad_mouse_t report = {
         .report_id = TRACKPAD_MOUSE_REPORT_ID,
         .buttons   = buttons,
         .x         = dx,
         .y         = dy
     };
-    // Use the same endpoint as PTP - different report ID distinguishes it
-    send_trackpad((report_digitizer_t *)&report);
+    send_digitizer_touchpad_mouse(&report);
 }
 
 // Reset mouse state when mode changes to avoid stale timers/state
@@ -353,7 +353,7 @@ static bool navigator_trackpad_ptp_task(void) {
     report[PTP_COUNT_BUTTONS_OFFSET] = (contact_count & 0x0F) | ((buttons & BUTTON_PRIMARY) << 4);
 
     // Get current input mode and handle mode changes
-    uint8_t input_mode = get_trackpad_input_mode();
+    uint8_t input_mode = digitizer_touchpad_get_input_mode();
     if (input_mode != prev_input_mode) {
         // Mode changed - reset mouse state to avoid stale timers/state
         reset_mouse_state();
@@ -363,7 +363,7 @@ static bool navigator_trackpad_ptp_task(void) {
     // Send PTP report only in PTP mode (mode 3)
     if (input_mode == TRACKPAD_INPUT_MODE_PTP) {
         if (contact_count > 0 || button_changed) {
-            send_trackpad((report_digitizer_t *)report);
+            send_digitizer_touchpad((report_digitizer_touchpad_t *)report);
         }
     }
 

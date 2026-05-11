@@ -70,6 +70,14 @@
 #    define TRACKPAD_PHYSICAL_HEIGHT 157 * TRACkbPAD_DIMENSIONS_FACTOR  // 1.57 inches (40mm actual size)
 #endif
 
+// New-name aliases consumed by digitizer.h parametric defines
+#ifndef DIGITIZER_TOUCHPAD_PHYSICAL_WIDTH
+#    define DIGITIZER_TOUCHPAD_PHYSICAL_WIDTH TRACKPAD_PHYSICAL_WIDTH
+#endif
+#ifndef DIGITIZER_TOUCHPAD_PHYSICAL_HEIGHT
+#    define DIGITIZER_TOUCHPAD_PHYSICAL_HEIGHT TRACKPAD_PHYSICAL_HEIGHT
+#endif
+
 // Logical coordinate range for HID descriptor (what we report to the OS)
 #define TRACKPAD_LOGICAL_MAX 2048
 

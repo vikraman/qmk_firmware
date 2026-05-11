@@ -196,20 +196,6 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
             HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_REPORT_SIZE(8, 0x10),
 #    endif
-#    ifdef POINTING_DEVICE_MACOS_SCROLL_RESOLUTION
-            // Add physical units for macOS scrolling
-            HID_RI_UNIT(8, 0x13),           // English Linear (inches)
-            HID_RI_UNIT_EXPONENT(8, -4),    // 10^-4 scale
-#        ifndef WHEEL_EXTENDED_REPORT
-            // Calculate: (127 / UNITS_PER_INCH) * 10000 for 10^-4 scale
-            HID_RI_PHYSICAL_MINIMUM(16, -(1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-            HID_RI_PHYSICAL_MAXIMUM(16,   (1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-#        else
-            // Calculate: (32767 / UNITS_PER_INCH) * 10000 for 10^-4 scale
-            HID_RI_PHYSICAL_MINIMUM(16, -(327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-            HID_RI_PHYSICAL_MAXIMUM(16,   (327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-#        endif
-#    endif
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_RELATIVE),
 
             // Horizontal wheel (1 or 2 bytes)
@@ -225,20 +211,6 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
             HID_RI_LOGICAL_MAXIMUM(16,  32767),
             HID_RI_REPORT_COUNT(8, 0x01),
             HID_RI_REPORT_SIZE(8, 0x10),
-#    endif
-#    ifdef POINTING_DEVICE_MACOS_SCROLL_RESOLUTION
-            // Add physical units for macOS scrolling
-            HID_RI_UNIT(8, 0x13),           // English Linear (inches)
-            HID_RI_UNIT_EXPONENT(8, -4),    // 10^-4 scale
-#        ifndef WHEEL_EXTENDED_REPORT
-            // Calculate: (127 / UNITS_PER_INCH) * 10000 for 10^-4 scale
-            HID_RI_PHYSICAL_MINIMUM(16, -(1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-            HID_RI_PHYSICAL_MAXIMUM(16,   (1270000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-#        else
-            // Calculate: (32767 / UNITS_PER_INCH) * 10000 for 10^-4 scale
-            HID_RI_PHYSICAL_MINIMUM(16, -(327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-            HID_RI_PHYSICAL_MAXIMUM(16,   (327670000 / POINTING_DEVICE_MACOS_SCROLL_UNITS_PER_INCH)),
-#        endif
 #    endif
             HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_RELATIVE),
 
@@ -384,9 +356,8 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
 #    endif
 #endif
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-// Include trackpad dimensions
-#include "drivers/sensors/navigator_trackpad_common.h"
+#ifdef DIGITIZER_MODE_TOUCHPAD
+#    include "digitizer.h"
 
 // PTP finger contact collection macro - reduces duplication for multi-finger support
 // Each finger reports: confidence, tip switch, contact ID, X position, Y position
@@ -419,24 +390,24 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM SharedReport[] = {
         /* X/Y Position (4 bytes) */                                                       \
         HID_RI_USAGE_PAGE(8, 0x01),    /* Generic Desktop */                               \
         HID_RI_LOGICAL_MINIMUM(8, 0x0),                                                    \
-        HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),                                  \
+        HID_RI_LOGICAL_MAXIMUM(16, DIGITIZER_TOUCHPAD_LOGICAL_MAX),                                  \
         HID_RI_REPORT_SIZE(8, 16),                                                         \
         HID_RI_UNIT_EXPONENT(8, 0x0E), /* -2 */                                            \
         HID_RI_UNIT(8, 0x11),          /* CM, English Linear */                            \
         HID_RI_USAGE(8, 0x30),         /* X */                                             \
         HID_RI_PHYSICAL_MINIMUM(8, 0x0),                                                   \
-        HID_RI_PHYSICAL_MAXIMUM(16, (TRACKPAD_PHYSICAL_WIDTH)),                            \
+        HID_RI_PHYSICAL_MAXIMUM(16, (DIGITIZER_TOUCHPAD_PHYSICAL_WIDTH)),                            \
         HID_RI_REPORT_COUNT(8, 0x01),                                                      \
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),               \
-        HID_RI_LOGICAL_MAXIMUM(16, TRACKPAD_LOGICAL_MAX),                                  \
-        HID_RI_PHYSICAL_MAXIMUM(16, (TRACKPAD_PHYSICAL_HEIGHT)),                           \
+        HID_RI_LOGICAL_MAXIMUM(16, DIGITIZER_TOUCHPAD_LOGICAL_MAX),                                  \
+        HID_RI_PHYSICAL_MAXIMUM(16, (DIGITIZER_TOUCHPAD_PHYSICAL_HEIGHT)),                           \
         HID_RI_USAGE(8, 0x31),         /* Y */                                             \
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),               \
         HID_RI_POP(0),                                                                     \
     HID_RI_END_COLLECTION(0)
 
 // Digitizer/Touchpad HID Descriptor
-const USB_Descriptor_HIDReport_Datatype_t PROGMEM PrecisionTrackpadReport[] = {
+const USB_Descriptor_HIDReport_Datatype_t PROGMEM DigitizerTouchpadReport[] = {
     HID_RI_USAGE_PAGE(8, 0x0D),            // Digitizers
     HID_RI_USAGE(8, 0x05),                 // Touchpad
     HID_RI_COLLECTION(8, 0x01),            // Application
@@ -1309,7 +1280,11 @@ const USB_Descriptor_Configuration_t PROGMEM ConfigurationDescriptor = {
         .CountryCode            = 0x00,
         .TotalReportDescriptors = 1,
         .HIDReportType          = HID_DTYPE_Report,
+#    ifdef DIGITIZER_MODE_TOUCHPAD
+        .HIDReportLength        = sizeof(DigitizerTouchpadReport)
+#    else
         .HIDReportLength        = sizeof(DigitizerReport)
+#    endif
     },
     .Digitizer_INEndpoint = {
         .Header = {
@@ -1323,45 +1298,6 @@ const USB_Descriptor_Configuration_t PROGMEM ConfigurationDescriptor = {
     },
 #endif
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-    /*
-     * Precision Trackpad
-     */
-    .Trackpad_Interface  = {
-        .Header = {
-            .Size               = sizeof(USB_Descriptor_Interface_t),
-            .Type               = DTYPE_Interface
-        },
-        .InterfaceNumber        = TRACKPAD_INTERFACE,
-        .AlternateSetting       = 0x00,
-        .TotalEndpoints         = 1,
-        .Class                  = HID_CSCP_HIDClass,
-        .SubClass               = HID_CSCP_NonBootSubclass,
-        .Protocol               = HID_CSCP_NonBootProtocol,
-        .InterfaceStrIndex      = NO_DESCRIPTOR
-    },
-    .Trackpad_HID = {
-        .Header = {
-            .Size               = sizeof(USB_HID_Descriptor_HID_t),
-            .Type               = HID_DTYPE_HID
-        },
-        .HIDSpec                = VERSION_BCD(1, 1, 1),
-        .CountryCode            = 0x00,
-        .TotalReportDescriptors = 1,
-        .HIDReportType          = HID_DTYPE_Report,
-        .HIDReportLength        = sizeof(PrecisionTrackpadReport)
-    },
-    .Trackpad_INEndpoint = {
-        .Header = {
-            .Size               = sizeof(USB_Descriptor_Endpoint_t),
-            .Type               = DTYPE_Endpoint
-        },
-        .EndpointAddress        = (ENDPOINT_DIR_IN | TRACKPAD_IN_EPNUM),
-        .Attributes             = (EP_TYPE_INTERRUPT | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
-        .EndpointSize           = TRACKPAD_EPSIZE,
-        .PollingIntervalMS      = USB_POLLING_INTERVAL_MS
-    },
-#endif
 };
 
 /*
@@ -1565,13 +1501,6 @@ uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const 
 
                     break;
 #endif
-#ifdef PRECISION_TRACKPAD_ENABLE
-                case TRACKPAD_INTERFACE:
-                    Address = &ConfigurationDescriptor.Trackpad_HID;
-                    Size    = sizeof(USB_HID_Descriptor_HID_t);
-
-                    break;
-#endif
             }
 
             break;
@@ -1624,14 +1553,13 @@ uint16_t get_usb_descriptor(const uint16_t wValue, const uint16_t wIndex, const 
 #endif
 #if defined(DIGITIZER_ENABLE) && !defined(DIGITIZER_SHARED_EP)
                 case DIGITIZER_INTERFACE:
+#    ifdef DIGITIZER_MODE_TOUCHPAD
+                    Address = &DigitizerTouchpadReport;
+                    Size    = sizeof(DigitizerTouchpadReport);
+#    else
                     Address = &DigitizerReport;
                     Size    = sizeof(DigitizerReport);
-                    break;
-#endif
-#ifdef PRECISION_TRACKPAD_ENABLE
-                case TRACKPAD_INTERFACE:
-                    Address = &PrecisionTrackpadReport;
-                    Size    = sizeof(PrecisionTrackpadReport);
+#    endif
                     break;
 #endif
             }

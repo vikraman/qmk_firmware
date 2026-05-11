@@ -11,12 +11,15 @@
 #include "usb_types.h"
 #include "usb_driver.h"
 #include "report.h"
+#ifdef DIGITIZER_MODE_TOUCHPAD
+#    include "digitizer.h"
+#endif
 
 extern usb_endpoint_in_t     usb_endpoints_in[USB_ENDPOINT_IN_COUNT];
 extern usb_endpoint_in_lut_t usb_endpoint_interface_lut[TOTAL_INTERFACES];
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-extern uint8_t get_trackpad_input_mode(void);
+#ifdef DIGITIZER_MODE_TOUCHPAD
+extern uint8_t digitizer_touchpad_get_input_mode(void);
 #endif
 
 void usb_set_report(usb_fs_report_t **reports, const uint8_t *data, size_t length) {
@@ -88,10 +91,10 @@ bool usb_get_report_cb(USBDriver *driver) {
 
     static usb_fs_report_t report;
 
-#ifdef PRECISION_TRACKPAD_ENABLE
+#ifdef DIGITIZER_MODE_TOUCHPAD
     // Handle digitizer/touchpad feature report requests
     // Touchpad interface uses its own report ID space (1-5)
-    if (interface == TRACKPAD_INTERFACE) {
+    if (interface == DIGITIZER_INTERFACE) {
         static uint8_t feature_report[2];
 
         switch (report_id) {
@@ -100,14 +103,14 @@ bool usb_get_report_cb(USBDriver *driver) {
                 // Pad Type: 0=Clickpad (depressible), 1=Pressure-pad
                 // Navigator: 2 contacts max, clickpad (type 0)
                 feature_report[0] = 0x02;
-                feature_report[1] = (DIGITIZER_CONTACT_COUNT << 0) | (0 << 4) | (0 << 7);
+                feature_report[1] = (DIGITIZER_TOUCHPAD_CONTACT_COUNT << 0) | (0 << 4) | (0 << 7);
                 usbSetupTransfer(driver, feature_report, 2, NULL);
                 return true;
 
             case 0x04:  // Configuration - Input Mode
                 // Report current input mode (0 = mouse, 3 = PTP)
                 feature_report[0] = 0x04;
-                feature_report[1] = get_trackpad_input_mode();
+                feature_report[1] = digitizer_touchpad_get_input_mode();
                 usbSetupTransfer(driver, feature_report, 2, NULL);
                 return true;
 

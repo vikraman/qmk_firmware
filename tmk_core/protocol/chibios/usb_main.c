@@ -58,17 +58,17 @@ extern keymap_config_t keymap_config;
 extern usb_endpoint_in_t  usb_endpoints_in[USB_ENDPOINT_IN_COUNT];
 extern usb_endpoint_out_t usb_endpoints_out[USB_ENDPOINT_OUT_COUNT];
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-// Trackpad input mode: 0 = Mouse, 3 = PTP (Precision Touchpad)
-// Default to mouse mode for maximum compatibility
-static uint8_t trackpad_input_mode = 0;
+#ifdef DIGITIZER_MODE_TOUCHPAD
+// Input mode: 0 = Mouse (boot, default per spec), 3 = Windows Precision Touchpad.
+// Host writes feature report 0x04 to switch.
+static uint8_t digitizer_touchpad_input_mode = 0;
 
-uint8_t get_trackpad_input_mode(void) {
-    return trackpad_input_mode;
+uint8_t digitizer_touchpad_get_input_mode(void) {
+    return digitizer_touchpad_input_mode;
 }
 
-void set_trackpad_input_mode(uint8_t mode) {
-    trackpad_input_mode = mode;
+static void digitizer_touchpad_set_input_mode(uint8_t mode) {
+    digitizer_touchpad_input_mode = mode;
 }
 #endif
 
@@ -259,15 +259,14 @@ static void usb_event_cb(USBDriver *usbp, usbevent_t event) {
 
 static uint8_t _Alignas(4) set_report_buf[2];
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-static void set_trackpad_transfer_cb(USBDriver *usbp) {
+#ifdef DIGITIZER_MODE_TOUCHPAD
+static void digitizer_touchpad_set_input_mode_cb(USBDriver *usbp) {
     usb_control_request_t *setup = (usb_control_request_t *)usbp->setup;
     uint8_t report_id = setup->wValue.lbyte;
 
-    // Report ID 0x04 is the Input Mode feature report
+    // Feature report 0x04 carries the Input Mode value (byte 1)
     if (report_id == 0x04 && setup->wLength >= 2) {
-        // set_report_buf[0] = report_id, set_report_buf[1] = input mode
-        set_trackpad_input_mode(set_report_buf[1]);
+        digitizer_touchpad_set_input_mode(set_report_buf[1]);
     }
 }
 #endif
@@ -340,10 +339,10 @@ static bool usb_requests_hook_cb(USBDriver *usbp) {
 #    endif
                                 break;
 #endif
-#ifdef PRECISION_TRACKPAD_ENABLE
-                            case TRACKPAD_INTERFACE:
+#ifdef DIGITIZER_MODE_TOUCHPAD
+                            case DIGITIZER_INTERFACE:
                                 // Accept SET_REPORT for PTP - handle input mode switching
-                                usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), set_trackpad_transfer_cb);
+                                usbSetupTransfer(usbp, set_report_buf, sizeof(set_report_buf), digitizer_touchpad_set_input_mode_cb);
                                 return true;
 #endif
                         }
@@ -556,9 +555,13 @@ void send_digitizer(report_digitizer_t *report) {
 #endif
 }
 
-#ifdef PRECISION_TRACKPAD_ENABLE
-void send_trackpad(report_trackpad_t *report) {
-    send_report(USB_ENDPOINT_IN_TRACKPAD, report, sizeof(report_trackpad_t));
+#ifdef DIGITIZER_MODE_TOUCHPAD
+void send_digitizer_touchpad(report_digitizer_touchpad_t *report) {
+    send_report(USB_ENDPOINT_IN_DIGITIZER, report, sizeof(report_digitizer_touchpad_t));
+}
+
+void send_digitizer_touchpad_mouse(report_digitizer_touchpad_mouse_t *report) {
+    send_report(USB_ENDPOINT_IN_DIGITIZER, report, sizeof(report_digitizer_touchpad_mouse_t));
 }
 #endif
 

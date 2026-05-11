@@ -88,6 +88,10 @@ ifeq ($(strip $(PRECISION_TRACKPAD_ENABLE)), yes)
     OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
 endif
 
+ifeq ($(strip $(DIGITIZER_MODE)), touchpad)
+    OPT_DEFS += -DDIGITIZER_MODE_TOUCHPAD
+endif
+
 ifeq ($(strip $(SHARED_EP_ENABLE)), yes)
     OPT_DEFS += -DSHARED_EP_ENABLE
 endif

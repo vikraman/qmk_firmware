@@ -204,6 +204,26 @@ ifeq ($(strip $(PRECISION_TRACKPAD_ENABLE)), yes)
     endif
 endif
 
+# Digitizer feature
+DIGITIZER_MODE ?= stylus
+
+VALID_DIGITIZER_MODE_TYPES := stylus touchpad
+
+ifeq ($(strip $(DIGITIZER_ENABLE)), yes)
+    ifeq ($(filter $(DIGITIZER_MODE),$(VALID_DIGITIZER_MODE_TYPES)),)
+        $(call CATASTROPHIC_ERROR,Invalid DIGITIZER_MODE,DIGITIZER_MODE="$(DIGITIZER_MODE)" is not a valid mode)
+    endif
+
+    ifeq ($(strip $(DIGITIZER_MODE)), touchpad)
+        OPT_DEFS += -DDIGITIZER_MODE_TOUCHPAD
+        # Transitional: keep the legacy flag alive until Phase G so the existing
+        # gated code keeps compiling while we migrate guards file by file.
+        OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
+    else
+        OPT_DEFS += -DDIGITIZER_MODE_STYLUS
+    endif
+endif
+
 QUANTUM_PAINTER_ENABLE ?= no
 ifeq ($(strip $(QUANTUM_PAINTER_ENABLE)), yes)
     include $(QUANTUM_DIR)/painter/rules.mk

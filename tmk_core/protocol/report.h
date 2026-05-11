@@ -39,12 +39,7 @@ enum hid_report_ids {
     REPORT_ID_NKRO,
     REPORT_ID_JOYSTICK,
     REPORT_ID_DIGITIZER,
-    REPORT_ID_DIGITIZER_STYLUS,
-    REPORT_ID_DIGITIZER_CONFIGURATION,
-    REPORT_ID_DIGITIZER_GET_FEATURE,
-    REPORT_ID_DIGITIZER_FUNCTION_SWITCH,
-    REPORT_ID_DIGITIZER_CERTIFICATE,
-    REPORT_ID_COUNT = REPORT_ID_DIGITIZER_CERTIFICATE
+    REPORT_ID_COUNT = REPORT_ID_DIGITIZER
 };
 
 #define IS_VALID_REPORT_ID(id) ((id) >= REPORT_ID_ALL && (id) <= REPORT_ID_COUNT)
@@ -234,66 +229,16 @@ typedef struct {
 } PACKED report_mouse_t;
 
 typedef struct {
-    uint8_t  report_id;
-    uint8_t  in_range : 1;
-    uint8_t  tip : 1;
-    uint8_t  barrel : 1;
+#ifdef DIGITIZER_SHARED_EP
+    uint8_t report_id;
+#endif
+    bool     in_range : 1;
+    bool     tip : 1;
+    bool     barrel : 1;
     uint8_t  reserved : 5;
     uint16_t x;
     uint16_t y;
-} PACKED report_digitizer_stylus_t;
-
-// Digitizer/Touchpad report structures
-// Per-contact data structure - 6 bytes per contact
-// Byte layout: [conf:1 + tip:1 + pad:6] [id:3 + pad:5] [X low] [X high] [Y low] [Y high]
-typedef struct {
-    uint8_t  confidence : 1;
-    uint8_t  tip : 1;
-    uint8_t  reserved : 6;
-    uint8_t  contact_id : 3;
-    uint8_t  reserved2 : 5;
-    uint16_t x;
-    uint16_t y;
-} PACKED digitizer_finger_report_t;
-
-// Main digitizer/touchpad input report
-// Field order: [ReportID][Contacts...][ScanTime][Count:4+Buttons:3+Pad:1]
-#ifndef DIGITIZER_CONTACT_COUNT
-#define DIGITIZER_CONTACT_COUNT 2
-#endif
-
-typedef struct {
-    uint8_t report_id;
-#if DIGITIZER_CONTACT_COUNT > 0
-    digitizer_finger_report_t fingers[DIGITIZER_CONTACT_COUNT];
-#endif
-    uint16_t scan_time;
-    uint8_t  contact_count : 4;
-    uint8_t  button1 : 1;
-    uint8_t  button2 : 1;
-    uint8_t  button3 : 1;
-    uint8_t  reserved2 : 1;
 } PACKED report_digitizer_t;
-
-// Verify structure sizes
-_Static_assert(sizeof(digitizer_finger_report_t) == 6, "digitizer_finger_report_t must be 6 bytes");
-_Static_assert(sizeof(report_digitizer_t) == 16, "report_digitizer_t must be 16 bytes");
-
-// Legacy alias for compatibility
-typedef report_digitizer_t report_trackpad_t;
-
-// Trackpad fallback mouse report - for systems that don't support PTP
-// Report format: [report_id: 1 byte] [buttons: 1 byte] [x: 1 byte] [y: 1 byte]
-#define TRACKPAD_MOUSE_REPORT_ID 0x06
-
-typedef struct {
-    uint8_t report_id;
-    uint8_t buttons;
-    int8_t  x;
-    int8_t  y;
-} PACKED report_trackpad_mouse_t;
-
-_Static_assert(sizeof(report_trackpad_mouse_t) == 4, "report_trackpad_mouse_t must be 4 bytes");
 
 // Touchpad-mode report structures (DIGITIZER_MODE_TOUCHPAD).
 // Per-contact data structure - 6 bytes per contact

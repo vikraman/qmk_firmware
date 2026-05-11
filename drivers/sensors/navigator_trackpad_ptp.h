@@ -3,9 +3,18 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
 #include "navigator_trackpad_common.h"
-#include "precision_trackpad_drivers.h"
 #include "report.h"
+
+// Precision trackpad driver interface (moved from quantum/precision_trackpad_drivers.h during Phase D refactor)
+typedef struct {
+    void (*init)(void);
+    bool (*task)(void);
+    void (*set_cpi)(uint16_t);
+    uint16_t (*get_cpi)(void);
+} precision_trackpad_driver_t;
 
 // Mouse fallback mode configuration (when host doesn't support PTP)
 // TRACKPAD_MOUSE_SENSITIVITY: Movement multiplier (0.5 = slower, 1.0 = normal, 2.0 = faster)

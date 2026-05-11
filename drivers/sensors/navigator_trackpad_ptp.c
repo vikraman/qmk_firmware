@@ -8,7 +8,6 @@
 #include <math.h>
 #include "navigator_trackpad_ptp.h"
 #include "navigator_trackpad_common.h"
-#include "precision_trackpad_drivers.h"
 #include "quantum.h"
 #include "report.h"
 #include "timer.h"

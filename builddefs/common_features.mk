@@ -184,7 +184,6 @@ ifeq ($(strip $(PRECISION_TRACKPAD_ENABLE)), yes)
             PRECISION_TRACKPAD_DRIVER="$(PRECISION_TRACKPAD_DRIVER)" is not a valid PTP driver)
     else
         OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
-        SRC += $(QUANTUM_DIR)/precision_trackpad.c
 
         # Include driver source (unless custom)
         ifneq ($(strip $(PRECISION_TRACKPAD_DRIVER)), custom)

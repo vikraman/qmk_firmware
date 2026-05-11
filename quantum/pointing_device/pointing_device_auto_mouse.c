@@ -15,7 +15,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 
 #    include <stdlib.h>

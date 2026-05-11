@@ -157,48 +157,9 @@ ifeq ($(strip $(POINTING_DEVICE_ENABLE)), yes)
             SRC += $(QUANTUM_DIR)/pointing_device/pointing_device_gestures.c
         else ifeq ($(strip $(POINTING_DEVICE_DRIVER)), pimoroni_trackball)
             I2C_DRIVER_REQUIRED = yes
-        else ifeq ($(strip $(POINTING_DEVICE_DRIVER)), navigator_trackpad)
-            I2C_DRIVER_REQUIRED = yes
-            SRC += drivers/sensors/navigator.c
-            SRC += drivers/sensors/navigator_trackpad_common.c
-            SRC += drivers/sensors/navigator_trackpad.c
-            SRC += drivers/sensors/navigator_trackpad_mouse.c
-            # Define PTP mode for mouse mode (uses absolute coordinates internally)
-            OPT_DEFS += -DNAVIGATOR_TRACKPAD_PTP_MODE
         else ifneq ($(filter $(strip $(POINTING_DEVICE_DRIVER)),pmw3360 pmw3389),)
             SPI_DRIVER_REQUIRED = yes
             SRC += drivers/sensors/pmw33xx_common.c
-        endif
-    endif
-endif
-
-PRECISION_TRACKPAD_ENABLE ?= no
-
-# Valid precision trackpad driver types
-VALID_PRECISION_TRACKPAD_DRIVER_TYPES := navigator_trackpad custom
-
-ifeq ($(strip $(PRECISION_TRACKPAD_ENABLE)), yes)
-    # Validate driver type
-    ifeq ($(filter $(PRECISION_TRACKPAD_DRIVER),$(VALID_PRECISION_TRACKPAD_DRIVER_TYPES)),)
-        $(call CATASTROPHIC_ERROR,Invalid PRECISION_TRACKPAD_DRIVER,\
-            PRECISION_TRACKPAD_DRIVER="$(PRECISION_TRACKPAD_DRIVER)" is not a valid PTP driver)
-    else
-        OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
-
-        # Include driver source (unless custom)
-        ifneq ($(strip $(PRECISION_TRACKPAD_DRIVER)), custom)
-            # Add common code
-            SRC += drivers/sensors/navigator_trackpad_common.c
-            SRC += drivers/sensors/navigator_trackpad_ptp.c
-            SRC += drivers/sensors/navigator.c
-            I2C_DRIVER_REQUIRED = yes
-
-            # Define PTP mode for precision trackpad
-            OPT_DEFS += -DNAVIGATOR_TRACKPAD_PTP_MODE
-
-            # Set driver name macro (used by PRECISION_TRACKPAD_DRIVER macro)
-            OPT_DEFS += -DPRECISION_TRACKPAD_DRIVER_NAME=$(strip $(PRECISION_TRACKPAD_DRIVER))
-            OPT_DEFS += -DPRECISION_TRACKPAD_DRIVER_$(strip $(shell echo $(PRECISION_TRACKPAD_DRIVER) | tr '[:lower:]' '[:upper:]'))
         endif
     endif
 endif
@@ -215,9 +176,6 @@ ifeq ($(strip $(DIGITIZER_ENABLE)), yes)
 
     ifeq ($(strip $(DIGITIZER_MODE)), touchpad)
         OPT_DEFS += -DDIGITIZER_MODE_TOUCHPAD
-        # Transitional: keep the legacy flag alive until Phase G so the existing
-        # gated code keeps compiling while we migrate guards file by file.
-        OPT_DEFS += -DPRECISION_TRACKPAD_ENABLE
     else
         OPT_DEFS += -DDIGITIZER_MODE_STYLUS
     endif

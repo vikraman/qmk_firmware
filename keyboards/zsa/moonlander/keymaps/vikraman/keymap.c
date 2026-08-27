@@ -35,6 +35,8 @@ enum tap_dance_codes {
 #define RA_E LALT_T(KC_E)
 #define RC_I RCTL_T(KC_I)
 
+#define GU_SPC MT(MOD_LGUI, KC_SPACE)
+
 // clang-format off
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT_moonlander(
@@ -43,7 +45,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_LEFT_CTRL,   KC_A,           LC_S,           LA_D,           LG_F,           KC_G,           KC_HYPR,                                        KC_MEH,         KC_H,           RG_J,           RA_K,           RC_L,           KC_SCLN,        KC_QUOTE,
     KC_LEFT_SHIFT,  KC_Z,           KC_X,           KC_C,           LS_V,           KC_B,                                                                           KC_N,           RS_M,           KC_COMMA,       KC_DOT,         KC_UP,          KC_SLASH,
     CW_TOGG,        KC_LEFT_CTRL,   KC_LEFT_ALT,    KC_LEFT_GUI,    MO(4),          KC_HYPR,                                                                        KC_MEH,         MO(5),          TD(DANCE_0),    KC_LEFT,        KC_DOWN,        KC_RIGHT,
-    MT(MOD_LGUI, KC_SPACE),LT(2, KC_TAB),  KC_HYPR,                        KC_MEH,TD(DANCE_1),    LT(3, KC_ENTER)
+    GU_SPC,         LT(2, KC_TAB),  KC_HYPR,                        KC_MEH,TD(DANCE_1),    LT(3, KC_ENTER)
   ),
   [1] = LAYOUT_moonlander(
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
@@ -305,6 +307,7 @@ uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
         case RG_H:
         case RA_E:
         case RC_I:
+        case GU_SPC:
             return 100;
         default:
             return 0;

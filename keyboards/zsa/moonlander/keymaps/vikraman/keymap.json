@@ -4,6 +4,7 @@
         "zsa/defaults",
         "getreuer/select_word",
         "getreuer/lumino",
-        "getreuer/palettefx"
+        "getreuer/palettefx",
+        "getreuer/orbital_mouse"
     ]
 }

@@ -87,7 +87,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                 KC_TRANSPARENT, KC_0,           KC_1
   ),
   [5] = LAYOUT_moonlander(
-    AU_TOGG,        KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, QK_BOOT,
+    AU_TOGG,        LUMINO,         KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, QK_BOOT,
     MU_TOGG,        KC_TRANSPARENT, KC_MS_BTN1,     KC_MS_UP,       KC_MS_BTN2,     KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
     MU_NEXT,        KC_TRANSPARENT, KC_MS_LEFT,     KC_MS_DOWN,     KC_MS_RIGHT,    KC_TRANSPARENT, RGB_TOG,                                                                        TOGGLE_LAYER_COLOR,KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_MEDIA_PLAY_PAUSE,
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, RGB_TOG,                                 RGB_MODE_FORWARD, KC_TRANSPARENT, KC_MEDIA_PREV_TRACK,KC_MEDIA_NEXT_TRACK,KC_TRANSPARENT, KC_TRANSPARENT,
@@ -118,6 +118,17 @@ void keyboard_post_init_user(void) {
     rgb_matrix_enable();
 }
 
+// set rgb once after full boot
+void housekeeping_task_user(void) {
+    static bool did_init = false;
+    if (!did_init) {
+        did_init = true;
+        rgb_matrix_set_flags(LED_FLAG_ALL); // RGB_TOG can leave this stuck off
+        rgb_matrix_mode_noeeprom(RGB_MATRIX_COMMUNITY_MODULE_PALETTEFX_REACTIVE);
+        lumino_set_value(255);
+    }
+}
+
 /* RGB LED map appears to number keys thusly
 
 0 5 10 15 20 25 29         65 61 56 51 46 41 36
@@ -140,11 +151,15 @@ const uint8_t PROGMEM ledmap[][RGB_MATRIX_LED_COUNT][3] = {
 
   [4] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {152,255,255}, {74,255,206}, {0,0,0}, {0,0,0}, {0,0,0}, {74,255,206}, {74,255,206}, {0,0,0}, {0,0,0}, {0,0,0}, {152,255,255}, {74,255,206}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} },
 
-  [5] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {188,255,255}, {131,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {131,255,255}, {131,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {188,255,255}, {131,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,245,245}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} },
+  [5] = {{0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {30,150,150}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {188,255,255}, {131,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {131,255,255}, {131,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {188,255,255}, {131,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,245,245}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {43,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}},
 
 };
 
 // clang-format on
+
+static bool ledmap_entry_lit(int layer, int i) {
+    return pgm_read_byte(&ledmap[layer][i][0]) || pgm_read_byte(&ledmap[layer][i][1]) || pgm_read_byte(&ledmap[layer][i][2]);
+}
 
 void set_layer_color(int layer) {
     for (int i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
@@ -153,11 +168,22 @@ void set_layer_color(int layer) {
             .s = pgm_read_byte(&ledmap[layer][i][1]),
             .v = pgm_read_byte(&ledmap[layer][i][2]),
         };
-        if (!hsv.h && !hsv.s && !hsv.v) {
-            rgb_matrix_set_color(i, 0, 0, 0);
-        } else {
+        if (hsv.h || hsv.s || hsv.v) {
             RGB rgb = hsv_to_rgb_with_value(hsv);
             rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
+        }
+        // else left alone, so the active effect shows through
+    }
+}
+
+// clears indicators lit on the old layer but not the new one, once per switch
+static void clear_stale_indicators(int old_layer, int new_layer) {
+    if (old_layer < 0 || old_layer == new_layer) {
+        return;
+    }
+    for (int i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+        if (ledmap_entry_lit(old_layer, i) && !ledmap_entry_lit(new_layer, i)) {
+            rgb_matrix_set_color(i, 0, 0, 0);
         }
     }
 }
@@ -166,37 +192,17 @@ bool rgb_matrix_indicators_user(void) {
     if (rawhid_state.rgb_control) {
         return false;
     }
-    if (!keyboard_config.disable_layer_led) {
-        switch (biton32(layer_state)) {
-            case 0:
-                set_layer_color(0);
-                break;
-            case 1:
-                set_layer_color(1);
-                break;
-            case 2:
-                set_layer_color(2);
-                break;
-            case 3:
-                set_layer_color(3);
-                break;
-            case 4:
-                set_layer_color(4);
-                break;
-            case 5:
-                set_layer_color(5);
-                break;
-            default:
-                if (rgb_matrix_get_flags() == LED_FLAG_NONE) {
-                    rgb_matrix_set_color_all(0, 0, 0);
-                }
-        }
-    } else {
-        if (rgb_matrix_get_flags() == LED_FLAG_NONE) {
-            rgb_matrix_set_color_all(0, 0, 0);
-        }
+    static int8_t last_layer = -1;
+    int8_t        cur_layer  = biton32(layer_state);
+
+    if (!keyboard_config.disable_layer_led && cur_layer >= 0 && cur_layer <= 5) {
+        clear_stale_indicators(last_layer, cur_layer);
+        set_layer_color(cur_layer);
+    } else if (rgb_matrix_get_flags() == LED_FLAG_NONE) {
+        rgb_matrix_set_color_all(0, 0, 0);
     }
 
+    last_layer = cur_layer;
     return true;
 }
 

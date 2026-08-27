@@ -1,5 +1,6 @@
 #include QMK_KEYBOARD_H
 #include "version.h"
+#include "magic.h"
 #define MOON_LED_LEVEL LED_LEVEL
 #ifndef ZSA_SAFE_RANGE
 #    define ZSA_SAFE_RANGE SAFE_RANGE
@@ -14,6 +15,7 @@ enum tap_dance_codes {
     TD_GRAPHITE,
     TD_BSPC,
     TD_ESC_GRV,
+    TD_SELWORD,
 };
 
 // QWERTY
@@ -49,8 +51,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     LT(3, KC_TAB),  KC_Q,           KC_W,           KC_E,           KC_R,           KC_T,           TG(4),                                          TG(5),          KC_Y,           KC_U,           KC_I,           KC_O,           KC_P,           KC_BSLS,
     OSM(MOD_LCTL),  KC_A,           LC_S,           LA_D,           LG_F,           ME_G,           QK_REP,                                         QK_AREP,        ME_H,           RG_J,           RA_K,           RC_L,           KC_SCLN,        KC_QUOTE,
     OSM(MOD_LSFT),  KC_Z,           KC_X,           KC_C,           LS_V,           HY_B,                                                                           HY_N,           RS_M,           KC_COMMA,       KC_DOT,         KC_UP,          KC_SLASH,
-    CW_TOGG,        KC_LEFT_CTRL,   KC_LEFT_ALT,    KC_LEFT_GUI,    MO(4),          KC_NO,                                                                          KC_NO,          MO(5),          TD(TD_GRAPHITE),KC_LEFT,        KC_DOWN,        KC_RIGHT,
-    GU_SPC,         LT(2, KC_TAB),  KC_HYPR,                        KC_MEH,         TD(TD_BSPC),    LT(3, KC_ENTER)
+    AC_TOGG,        KC_LEFT_CTRL,   KC_LEFT_ALT,    KC_LEFT_GUI,    MO(4),          KC_NO,                                                                          KC_NO,          MO(5),          TD(TD_GRAPHITE),KC_LEFT,        KC_DOWN,        KC_RIGHT,
+    GU_SPC,         LT(2, KC_TAB),  MAGIC,                          TD(TD_SELWORD), TD(TD_BSPC),    LT(3, KC_ENTER)
   ),
   [1] = LAYOUT_moonlander(
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
@@ -128,9 +130,9 @@ void keyboard_post_init_user(void) {
 
 // clang-format off
 const uint8_t PROGMEM ledmap[][RGB_MATRIX_LED_COUNT][3] = {
-  [0] = {{0,0,0}, {204,150,150}, {139,204,224}, {88,171,107}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {138,18,181}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {236,156,217}, {0,0,0}, {0,0,0}, {236,156,217}, {88,171,107}, {55,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {55,150,150}, {0,160,140}, {19,234,177}, {36,150,150}, {110,251,143}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {171,150,150}, {0,0,0}, {0,0,0}, {237,156,217}, {88,171,107}, {73,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {73,150,150}, {21,160,140}, {204,150,150}, {0,233,226}, {16,248,188}, {0,0,0}},
+  [0] = {{0,0,0}, {204,150,150}, {139,204,224}, {88,171,107}, {124,150,150}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {138,18,181}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {236,156,217}, {0,0,0}, {0,0,0}, {236,156,217}, {88,171,107}, {55,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {55,150,150}, {0,160,140}, {19,234,177}, {36,150,150}, {155,150,150}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {171,150,150}, {0,0,0}, {0,0,0}, {237,156,217}, {88,171,107}, {73,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {73,150,150}, {21,160,140}, {204,150,150}, {0,233,226}, {220,150,150}, {0,0,0}},
 
-  [1] = {{0,0,0}, {204,150,150}, {139,204,224}, {88,171,107}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {138,18,181}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {236,156,217}, {0,0,0}, {0,0,0}, {236,156,217}, {88,171,107}, {55,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {55,150,150}, {0,160,140}, {19,234,177}, {36,150,150}, {110,251,143}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {0,0,140}, {0,0,0}, {0,0,0}, {237,156,217}, {88,171,107}, {73,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {73,150,150}, {21,160,140}, {204,150,150}, {0,233,226}, {16,248,188}, {0,0,0}},
+  [1] = {{0,0,0}, {204,150,150}, {139,204,224}, {88,171,107}, {124,150,150}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {138,18,181}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {236,156,217}, {0,0,0}, {0,0,0}, {236,156,217}, {88,171,107}, {55,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {55,150,150}, {0,160,140}, {19,234,177}, {36,150,150}, {155,150,150}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {139,204,224}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {138,18,181}, {0,0,0}, {0,0,140}, {0,0,0}, {0,0,0}, {237,156,217}, {88,171,107}, {73,150,150}, {0,0,0}, {0,0,0}, {16,248,188}, {110,251,143}, {0,0,0}, {73,150,150}, {21,160,140}, {204,150,150}, {0,233,226}, {220,150,150}, {0,0,0}},
 
   [2] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,245,245}, {0,0,0}, {0,245,245}, {0,0,0}, {0,0,0}, {0,245,245}, {0,0,0}, {0,245,245}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {74,255,255}, {74,255,255}, {74,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {188,255,255}, {188,255,255}, {188,255,255}, {0,0,0}, {0,0,0}, {188,255,255}, {188,255,255}, {188,255,255}, {0,0,0}, {0,0,0}, {188,255,255}, {188,255,255}, {188,255,255}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} },
 
@@ -205,7 +207,7 @@ typedef struct {
 
 enum { SINGLE_TAP = 1, SINGLE_HOLD, DOUBLE_TAP, DOUBLE_HOLD, DOUBLE_SINGLE_TAP, MORE_TAPS };
 
-static tap td_state[3];
+static tap td_state[4];
 
 uint8_t td_step(tap_dance_state_t *state);
 
@@ -310,10 +312,48 @@ void td_esc_grv_reset(tap_dance_state_t *state, void *user_data) {
     td_state[TD_ESC_GRV].step = 0;
 }
 
+// tap_code16 bypasses process_record, so module keycodes need this instead
+static void tap_module_keycode(uint16_t keycode) {
+    keyrecord_t record = {
+        .event =
+            {
+                .key     = {.row = 254, .col = 254},
+                .time    = (uint16_t)(timer_read() | 1),
+                .type    = KEY_EVENT,
+                .pressed = true,
+            },
+        .keycode = keycode,
+    };
+    process_record(&record);
+    record.event.pressed = false;
+    record.event.time    = (uint16_t)(timer_read() | 1);
+    process_record(&record);
+}
+
+void td_selword_finished(tap_dance_state_t *state, void *user_data) {
+    td_state[TD_SELWORD].step = td_step(state);
+    switch (td_state[TD_SELWORD].step) {
+        case SINGLE_TAP:
+            tap_module_keycode(SELWORD); // forward word
+            break;
+        case SINGLE_HOLD:
+            tap_module_keycode(SELLUP); // line up
+            break;
+        case DOUBLE_TAP:
+            tap_module_keycode(SELWBAK); // backward word
+            break;
+    }
+}
+
+void td_selword_reset(tap_dance_state_t *state, void *user_data) {
+    td_state[TD_SELWORD].step = 0;
+}
+
 tap_dance_action_t tap_dance_actions[] = {
     [TD_GRAPHITE] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, td_graphite_finished, td_graphite_reset),
     [TD_BSPC]     = ACTION_TAP_DANCE_FN_ADVANCED(on_td_bspc, td_bspc_finished, td_bspc_reset),
     [TD_ESC_GRV]  = ACTION_TAP_DANCE_FN_ADVANCED(NULL, td_esc_grv_finished, td_esc_grv_reset),
+    [TD_SELWORD]  = ACTION_TAP_DANCE_FN_ADVANCED(NULL, td_selword_finished, td_selword_reset),
 };
 
 uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
@@ -346,6 +386,8 @@ uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    magic_update_buffer(keycode, record);
+
     switch (keycode) {
         case OSM(MOD_LCTL): {
             static uint16_t last_lctl_press    = 0;
@@ -379,6 +421,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 SEND_STRING(SS_LCTL(SS_TAP(X_RIGHT)) SS_DELAY(100) SS_LCTL(SS_TAP(X_LEFT)) SS_DELAY(100) SS_LCTL(SS_LSFT(SS_TAP(X_RIGHT))));
             }
+            break;
+
+        // "Magic" key
+        case MAGIC:
+            magic_expand(record);
             break;
 
         case RGB_SLD:

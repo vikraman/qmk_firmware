@@ -129,6 +129,24 @@ void housekeeping_task_user(void) {
     }
 }
 
+// exceptions to the default chordal hold assumption
+bool get_chordal_hold(uint16_t tap_hold_keycode, keyrecord_t *tap_hold_record, uint16_t other_keycode, keyrecord_t *other_record) {
+    // same modifier on both hands is always a roll, never a chord
+    if (IS_QK_MOD_TAP(tap_hold_keycode) && IS_QK_MOD_TAP(other_keycode)) {
+        // bit 0x10 is the left/right flag; masked off so left/right count as the same mod
+        uint8_t mods_a = QK_MOD_TAP_GET_MODS(tap_hold_keycode) & 0x0F;
+        uint8_t mods_b = QK_MOD_TAP_GET_MODS(other_keycode) & 0x0F;
+        if (mods_a == mods_b) {
+            return false;
+        }
+    }
+    // Shift is capitalization, not a chord
+    if (tap_hold_keycode == LS_V || tap_hold_keycode == RS_M || tap_hold_keycode == LS_W || tap_hold_keycode == RS_P) {
+        return false;
+    }
+    return get_chordal_hold_default(tap_hold_record, other_record);
+}
+
 /* RGB LED map appears to number keys thusly
 
 0 5 10 15 20 25 29         65 61 56 51 46 41 36

@@ -50,7 +50,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     OSM(MOD_LCTL),  KC_A,           LC_S,           LA_D,           LG_F,           ME_G,           QK_REP,                                         QK_AREP,        ME_H,           RG_J,           RA_K,           RC_L,           KC_SCLN,        KC_QUOTE,
     OSM(MOD_LSFT),  KC_Z,           KC_X,           KC_C,           LS_V,           HY_B,                                                                           HY_N,           RS_M,           KC_COMMA,       KC_DOT,         KC_UP,          KC_SLASH,
     CW_TOGG,        KC_LEFT_CTRL,   KC_LEFT_ALT,    KC_LEFT_GUI,    MO(4),          KC_NO,                                                                          KC_NO,          MO(5),          TD(TD_GRAPHITE),KC_LEFT,        KC_DOWN,        KC_RIGHT,
-    GU_SPC,         LT(2, KC_TAB),  KC_HYPR,                        KC_MEH,TD(TD_BSPC),    LT(3, KC_ENTER)
+    GU_SPC,         LT(2, KC_TAB),  KC_HYPR,                        KC_MEH,         TD(TD_BSPC),    LT(3, KC_ENTER)
   ),
   [1] = LAYOUT_moonlander(
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
@@ -262,6 +262,7 @@ void td_bspc_finished(tap_dance_state_t *state, void *user_data) {
     td_state[TD_BSPC].step = td_step(state);
     switch (td_state[TD_BSPC].step) {
         case SINGLE_TAP:
+        case SINGLE_HOLD:
             register_code16(KC_BSPC);
             break;
         case DOUBLE_TAP:
@@ -277,6 +278,7 @@ void td_bspc_reset(tap_dance_state_t *state, void *user_data) {
     wait_ms(10);
     switch (td_state[TD_BSPC].step) {
         case SINGLE_TAP:
+        case SINGLE_HOLD:
             unregister_code16(KC_BSPC);
             break;
         case DOUBLE_TAP:

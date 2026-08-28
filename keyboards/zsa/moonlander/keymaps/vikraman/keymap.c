@@ -140,9 +140,30 @@ bool get_chordal_hold(uint16_t tap_hold_keycode, keyrecord_t *tap_hold_record, u
             return false;
         }
     }
-    // Shift is capitalization, not a chord
-    if (tap_hold_keycode == LS_V || tap_hold_keycode == RS_M || tap_hold_keycode == LS_W || tap_hold_keycode == RS_P) {
-        return false;
+    // home row mods roll into the opposite hand in common words
+    // never treat them as a deliberate chord
+    switch (tap_hold_keycode) {
+        case LC_S:
+        case LA_D:
+        case LG_F:
+        case ME_G:
+        case ME_H:
+        case RG_J:
+        case RA_K:
+        case RC_L:
+        case LS_V:
+        case RS_M:
+        case HY_B:
+        case HY_N:
+        case LC_R:
+        case LA_T:
+        case LG_S:
+        case RG_H:
+        case RA_E:
+        case RC_I:
+        case LS_W:
+        case RS_P:
+            return false;
     }
     return get_chordal_hold_default(tap_hold_record, other_record);
 }

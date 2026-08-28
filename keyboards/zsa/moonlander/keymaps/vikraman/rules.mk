@@ -10,3 +10,4 @@ LAYER_LOCK_ENABLE = yes
 AUTOCORRECT_ENABLE = yes
 
 SRC += magic.c
+SRC += leader_fns.c

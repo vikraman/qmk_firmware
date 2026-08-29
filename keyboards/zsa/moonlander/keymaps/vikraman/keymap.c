@@ -1,3 +1,4 @@
+#include "quantum_keycodes.h"
 #include QMK_KEYBOARD_H
 #include "version.h"
 #include "magic.h"
@@ -27,6 +28,7 @@ enum tap_dance_codes {
 #define RG_J RGUI_T(KC_J)
 #define RA_K LALT_T(KC_K)
 #define RC_L RCTL_T(KC_L)
+#define ME_H MEH_T(KC_H)
 #define HY_B HYPR_T(KC_B)
 #define HY_N HYPR_T(KC_N)
 
@@ -34,13 +36,15 @@ enum tap_dance_codes {
 #define LC_R LCTL_T(KC_R)
 #define LA_T LALT_T(KC_T)
 #define LG_S LGUI_T(KC_S)
-#define LS_W LSFT_T(KC_W)
+#define LS_C LSFT_T(KC_C)
 #define RS_P RSFT_T(KC_P)
 #define RG_H RGUI_T(KC_H)
 #define RA_E LALT_T(KC_E)
 #define RC_I RCTL_T(KC_I)
 #define ME_G MEH_T(KC_G)
-#define ME_H MEH_T(KC_H)
+#define ME_Y MEH_T(KC_Y)
+#define HY_V HYPR_T(KC_V)
+#define HY_K HYPR_T(KC_K)
 
 #define GU_SPC MT(MOD_LGUI, KC_SPACE)
 
@@ -56,10 +60,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
   [1] = LAYOUT_moonlander(
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
-    KC_TRANSPARENT, KC_Z,           KC_L,           KC_D,           KC_C,           KC_B,           KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_J,           KC_F,           KC_O,           KC_U,           KC_SCLN,        KC_TRANSPARENT,
-    KC_TRANSPARENT, KC_N,           LC_R,           LA_T,           LG_S,           KC_G,           KC_TRANSPARENT,                                                                 KC_TRANSPARENT, KC_Y,           RG_H,           RA_E,           RC_I,           KC_A,           KC_TRANSPARENT,
-    KC_TRANSPARENT, KC_Q,           KC_X,           KC_M,           LS_W,           KC_V,                                           KC_K,           RS_P,           KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
-    KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                                                                                 KC_TRANSPARENT, KC_TRANSPARENT, TO(0),          KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
+    KC_TRANSPARENT, KC_Q,           KC_L,           KC_D,           KC_W,           KC_B,           KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_J,           KC_F,           KC_O,           KC_U,           KC_SCLN,        KC_TRANSPARENT,
+    KC_TRANSPARENT, KC_N,           LC_R,           LA_T,           LG_S,           ME_G,           KC_TRANSPARENT,                                 KC_TRANSPARENT, KC_Y,           RG_H,           RA_E,           RC_I,           KC_A,           KC_TRANSPARENT,
+    KC_TRANSPARENT, KC_Z,           KC_X,           KC_M,           LS_C,           HY_V,                                                                           KC_K,           RS_P,           KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
+    KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                                                                 KC_TRANSPARENT, KC_TRANSPARENT, TO(0),          KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,
     KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT,                 KC_TRANSPARENT, KC_TRANSPARENT, KC_TRANSPARENT
   ),
   [2] = LAYOUT_moonlander(
@@ -116,6 +120,7 @@ RGB hsv_to_rgb_with_value(HSV hsv) {
 
 void keyboard_post_init_user(void) {
     rgb_matrix_enable();
+    layer_move(1);
 }
 
 // set rgb once after full boot
@@ -142,29 +147,7 @@ bool get_chordal_hold(uint16_t tap_hold_keycode, keyrecord_t *tap_hold_record, u
     }
     // home row mods roll into the opposite hand in common words
     // never treat them as a deliberate chord
-    switch (tap_hold_keycode) {
-        case LC_S:
-        case LA_D:
-        case LG_F:
-        case ME_G:
-        case ME_H:
-        case RG_J:
-        case RA_K:
-        case RC_L:
-        case LS_V:
-        case RS_M:
-        case HY_B:
-        case HY_N:
-        case LC_R:
-        case LA_T:
-        case LG_S:
-        case RG_H:
-        case RA_E:
-        case RC_I:
-        case LS_W:
-        case RS_P:
-            return false;
-    }
+    if (IS_QK_MOD_TAP(tap_hold_keycode)) return false;
     return get_chordal_hold_default(tap_hold_record, other_record);
 }
 
@@ -414,29 +397,10 @@ tap_dance_action_t tap_dance_actions[] = {
 
 uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
-        case LC_S:
-        case LA_D:
-        case LG_F:
-        case LS_V:
-        case RS_M:
-        case RG_J:
-        case RA_K:
-        case RC_L:
-        case LC_R:
-        case LA_T:
-        case LG_S:
-        case LS_W:
-        case RS_P:
-        case RG_H:
-        case RA_E:
-        case RC_I:
         case GU_SPC:
-        case HY_B:
-        case HY_N:
-        case ME_G:
-        case ME_H:
-            return 100;
+            return 150;
         default:
+            if (IS_QK_MOD_TAP(keycode)) return 100;
             return 0;
     }
 }

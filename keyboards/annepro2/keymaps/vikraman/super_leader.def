@@ -1,0 +1,38 @@
+#include "leader_fns.h"
+
+// personal info
+SEQ_STR(email, (KC_E, KC_M), "vikraman.choudhury@gmail.com")
+SEQ_STR(name, (KC_N, KC_M), "Vikraman")
+SEQ_STR(lastname, (KC_L, KC_N), "Choudhury")
+SEQ_STR(fullname, (KC_F, KC_N), "Vikraman Choudhury")
+SEQ_STR(site, (KC_S, KC_I), "https://vikraman.org")
+
+// misc snippets
+SEQ_STR(github, (KC_G, KC_H), "git@github.com:")
+SEQ_STR(shbash, (KC_S, KC_H), "#!/usr/bin/env bash")
+SEQ_STR(shpy, (KC_S, KC_P), "#!/usr/bin/env python3")
+SEQ_STR(todo, (KC_T, KC_D), "// TODO: ")
+
+// bracket/quote pairs, cursor placed between
+SEQ_FUN(paren, (KC_P, KC_N), leader_wrap, "()")
+SEQ_FUN(brace, (KC_B, KC_R), leader_wrap, "{}")
+SEQ_FUN(bracket, (KC_B, KC_K), leader_wrap, "[]")
+SEQ_FUN(angle, (KC_A, KC_N), leader_wrap, "<>")
+SEQ_FUN(dquote, (KC_D, KC_Q), leader_wrap, "\"\"")
+SEQ_FUN(squote, (KC_S, KC_Q), leader_wrap, "''")
+
+// LaTeX environments, prefixed L
+SEQ_FUN(doc, (KC_L, KC_D), leader_tex_env, "document")
+SEQ_FUN(eq, (KC_L, KC_Q), leader_tex_env, "equation")
+SEQ_FUN(align, (KC_L, KC_A), leader_tex_env, "align")
+SEQ_FUN(itemize, (KC_L, KC_I), leader_tex_env, "itemize")
+SEQ_FUN(enumerate, (KC_L, KC_E), leader_tex_env, "enumerate")
+SEQ_FUN(figure, (KC_L, KC_F), leader_tex_env, "figure")
+SEQ_FUN(tabular, (KC_L, KC_T), leader_tex_env, "tabular")
+SEQ_FUN(theorem, (KC_L, KC_H), leader_tex_env, "theorem")
+SEQ_FUN(proof, (KC_L, KC_P), leader_tex_env, "proof")
+SEQ_FUN(lemma, (KC_L, KC_M), leader_tex_env, "lemma")
+SEQ_FUN(verbatim, (KC_L, KC_V), leader_tex_env, "verbatim")
+SEQ_FUN(quote, (KC_L, KC_O), leader_tex_env, "quote")
+SEQ_FUN(matrix, (KC_L, KC_X), leader_tex_env, "pmatrix")
+SEQ_FUN(center, (KC_L, KC_C), leader_tex_env, "center")

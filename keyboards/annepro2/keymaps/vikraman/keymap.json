@@ -1,8 +1,10 @@
 {
     "modules": [
         "getreuer/select_word",
+        "getreuer/super_leader",
         "getreuer/sentence_case",
         "getreuer/lumino",
+        "getreuer/orbital_mouse",
         "getreuer/palettefx"
     ]
 }

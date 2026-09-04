@@ -1,0 +1,78 @@
+# Autocorrect dictionary. Syntax: "typo -> correction" (one per line).
+# Blank lines and lines starting with '#' are ignored.
+# Regenerate autocorrect_data.h after editing:
+#   qmk generate-autocorrect-data autocorrect_dict.txt -km vikraman -kb zsa/moonlander/reva
+#
+# :prefix means "typo must be preceded by a word boundary" (default here),
+# a leading ':' on the typo restricts matching to the start of a word.
+# See https://docs.qmk.fm/features/autocorrect for full syntax.
+
+:teh:      -> the
+:hte:      -> the
+:adn:      -> and
+:nad:      -> and
+:taht:     -> that
+:thier:    -> their
+recieve    -> receive
+seperate   -> separate
+definately -> definitely
+occured    -> occurred
+:untill:   -> until
+:wich:     -> which
+becuase    -> because
+fitler     -> filter
+lenght     -> length
+ouput      -> output
+widht      -> width
+funciton   -> function
+funtion    -> function
+retrun     -> return
+improt     -> import
+pritn      -> print
+cosnt      -> const
+
+# --- programming ---
+instnace   -> instance
+recrusion  -> recursion
+recuersive -> recursive
+:patern:   -> pattern
+declartion -> declaration
+implment   -> implement
+paramter   -> parameter
+arguemnt   -> argument
+:monda:    -> monad
+
+# --- prose ---
+theorm     -> theorem
+indution   -> induction
+reflexivty -> reflexivity
+transitivty -> transitivity
+associativty -> associativity
+commutativty -> commutativity
+isomorphim -> isomorphism
+homomorphim -> homomorphism
+
+# --- shell ---
+exprot     -> export
+:grpe      -> grep
+:alais:    -> alias
+envrionment -> environment
+varaible   -> variable
+directroy  -> directory
+permision  -> permission
+excecute   -> execute
+
+# --- math ---
+eqution    -> equation
+integeral  -> integral
+derivitive -> derivative
+matrx      -> matrix
+vecotr     -> vector
+algebric   -> algebraic
+topologial -> topological
+continous  -> continuous
+boundry    -> boundary
+coeficient -> coefficient
+polynomail -> polynomial
+inequaltiy -> inequality
+probabilty -> probability
